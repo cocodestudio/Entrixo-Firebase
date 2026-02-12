@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "227829765725",
+    "project_id": "entrixo",
+    "storage_bucket": "entrixo.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:227829765725:android:a2ae02b95a25c8c0211fb4",
+        "android_client_info": {
+          "package_name": "com.cocode.entrixo"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC6HO8tSdfnG6UzBVNI33WSGfn_lYidb2E"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -3,9 +3,12 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart' as path_provider;
 
 class ProfileState {
   final bool isLoading;
@@ -52,25 +55,25 @@ final userStreamProvider = StreamProvider<ProfileState>((ref) {
       .doc(user.uid)
       .snapshots()
       .map((doc) {
-    if (doc.exists) {
-      final data = doc.data()!;
-      return ProfileState(
-        name: data['name'] ?? '',
-        email: data['email'] ?? '',
-        profileUrl: data['profilePic'] ?? '',
-        role: data['role'] ?? 'student',
-        isLoading: false,
-      );
-    }
-    return ProfileState();
-  });
+        if (doc.exists) {
+          final data = doc.data()!;
+          return ProfileState(
+            name: data['name'] ?? '',
+            email: data['email'] ?? '',
+            profileUrl: data['profilePic'] ?? '',
+            role: data['role'] ?? 'student',
+            isLoading: false,
+          );
+        }
+        return ProfileState();
+      });
 });
 
 final profileControllerProvider =
-StateNotifierProvider<ProfileController, ProfileState>((ref) {
-  final streamData = ref.watch(userStreamProvider).value ?? ProfileState();
-  return ProfileController(streamData);
-});
+    StateNotifierProvider<ProfileController, ProfileState>((ref) {
+      final streamData = ref.watch(userStreamProvider).value ?? ProfileState();
+      return ProfileController(streamData);
+    });
 
 class ProfileController extends StateNotifier<ProfileState> {
   ProfileController(ProfileState initialState) : super(initialState);
@@ -92,12 +95,12 @@ class ProfileController extends StateNotifier<ProfileState> {
   }
 
   Future<void> saveProfile(
-      dynamic context,
-      String newName,
-      String newEmail, {
-        VoidCallback? onSuccess,
-        Function(String)? onError,
-      }) async {
+    dynamic context,
+    String newName,
+    String newEmail, {
+    VoidCallback? onSuccess,
+    Function(String)? onError,
+  }) async {
     final user = _auth.currentUser;
     if (user == null) return;
 
@@ -107,17 +110,35 @@ class ProfileController extends StateNotifier<ProfileState> {
       String? downloadUrl = state.profileUrl;
 
       if (state.pickedImage != null) {
-        final ref =
-        _storage.ref().child('user_profiles').child('${user.uid}.jpg');
-        await ref.putFile(state.pickedImage!);
-        downloadUrl = await ref.getDownloadURL();
+        final dir = await path_provider.getTemporaryDirectory();
+        final targetPath = p.join(dir.absolute.path, "${user.uid}_temp.jpg");
+
+        XFile? compressedFile = await FlutterImageCompress.compressAndGetFile(
+          state.pickedImage!.absolute.path,
+          targetPath,
+          quality: 70,
+          format: CompressFormat.jpeg,
+        );
+
+        if (compressedFile != null) {
+          final ref = _storage
+              .ref()
+              .child('user_profiles')
+              .child('${user.uid}.jpg');
+
+          await ref.putFile(File(compressedFile.path));
+          downloadUrl = await ref.getDownloadURL();
+        }
       }
+      if (!mounted) return;
 
       await _firestore.collection('users').doc(user.uid).update({
         'name': newName,
         'email': newEmail,
         'profilePic': downloadUrl,
       });
+
+      if (!mounted) return;
 
       state = state.copyWith(
         isLoading: false,
@@ -129,8 +150,10 @@ class ProfileController extends StateNotifier<ProfileState> {
 
       if (onSuccess != null) onSuccess();
     } catch (e) {
-      state = state.copyWith(isLoading: false);
-      if (onError != null) onError(e.toString());
+      if (mounted) {
+        state = state.copyWith(isLoading: false);
+        if (onError != null) onError(e.toString());
+      }
     }
   }
 }

@@ -1,8 +1,9 @@
 import 'dart:ui';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
-
-import '../screens/profile_screen.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+import 'package:shimmer/shimmer.dart';
 
 class DashboardHeader extends SliverPersistentHeaderDelegate {
   final String userName;
@@ -24,298 +25,459 @@ class DashboardHeader extends SliverPersistentHeaderDelegate {
     final theme = Theme.of(context);
     final percent = math.min(shrinkOffset / (maxExtent - minExtent), 1.0);
 
-    final double nameSize = lerpDouble(24, 18, percent)!;
-    final double avatarSize = 54.0;
-    final double currentRadius = lerpDouble(32, 0, percent)!;
+    final double avatarSize = _lerpDouble(68, 52, percent);
+    final double nameSize = _lerpDouble(20, 18, percent);
+    final double headerRadius = _lerpDouble(30, 0, percent);
+    final double welcomeOpacity = (1.0 - (percent * 3)).clamp(0.0, 1.0);
+    final double verticalShift = _lerpDouble(0, 10, percent);
+    final double decorOpacity = (1.0 - percent).clamp(0.0, 1.0);
 
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
         borderRadius: BorderRadius.only(
-          bottomLeft: Radius.circular(currentRadius),
-          bottomRight: Radius.circular(currentRadius),
+          bottomLeft: Radius.circular(headerRadius),
+          bottomRight: Radius.circular(headerRadius),
         ),
         boxShadow: [
           BoxShadow(
-            color: theme.primaryColor.withOpacity(0.06),
-            blurRadius: 20,
-            offset: const Offset(0, 4),
+            color: const Color(
+              0xFF6366F1,
+            ).withOpacity(_lerpDouble(0.15, 0.25, percent)),
+            blurRadius: 30,
+            offset: const Offset(0, 8),
           ),
         ],
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.only(
-          bottomLeft: Radius.circular(currentRadius),
-          bottomRight: Radius.circular(currentRadius),
+          bottomLeft: Radius.circular(headerRadius),
+          bottomRight: Radius.circular(headerRadius),
         ),
         child: Stack(
-          clipBehavior: Clip.hardEdge,
           children: [
-            Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    theme.primaryColor.withOpacity(0.06),
-                    theme.primaryColor.withOpacity(0.10),
-                    theme.colorScheme.secondary.withOpacity(0.05),
-                  ],
-                  stops: const [0.0, 0.5, 1.0],
-                ),
-              ),
-            ),
-            Positioned(
-              top: lerpDouble(-50, -120, percent)!,
-              right: lerpDouble(-40, -100, percent)!,
-              child: Transform.scale(
-                scale: lerpDouble(1.0, 0.7, percent)!,
-                child: Container(
-                  width: 200,
-                  height: 200,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: RadialGradient(
-                      colors: [
-                        theme.primaryColor.withOpacity(0.15),
-                        theme.primaryColor.withOpacity(0.05),
-                        Colors.transparent,
-                      ],
-                      stops: const [0.0, 0.6, 1.0],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            Positioned(
-              top: lerpDouble(80, 20, percent)!,
-              left: lerpDouble(-70, -120, percent)!,
-              child: Transform.scale(
-                scale: lerpDouble(1.0, 0.6, percent)!,
-                child: Container(
-                  width: 160,
-                  height: 160,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: RadialGradient(
-                      colors: [
-                        theme.colorScheme.secondary.withOpacity(0.12),
-                        theme.colorScheme.secondary.withOpacity(0.04),
-                        Colors.transparent,
-                      ],
-                      stops: const [0.0, 0.6, 1.0],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            Positioned(
-              bottom: lerpDouble(-80, -140, percent)!,
-              right: lerpDouble(30, -20, percent)!,
-              child: Transform.rotate(
-                angle: percent * 0.6,
-                child: Transform.scale(
-                  scale: lerpDouble(1.0, 0.5, percent)!,
-                  child: Container(
-                    width: 140,
-                    height: 140,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(28),
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          theme.primaryColor.withOpacity(0.08),
-                          theme.primaryColor.withOpacity(0.03),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            Positioned(
-              top: lerpDouble(120, 50, percent)!,
-              right: lerpDouble(50, 20, percent)!,
-              child: Transform.rotate(
-                angle: -percent * 0.4,
-                child: Opacity(
-                  opacity: lerpDouble(1.0, 0.0, percent)!,
-                  child: Container(
-                    width: 90,
-                    height: 90,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(18),
-                      border: Border.all(
-                        color: theme.colorScheme.secondary.withOpacity(0.15),
-                        width: 2.5,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            Positioned(
-              top: lerpDouble(50, 10, percent)!,
-              left: lerpDouble(60, 20, percent)!,
-              child: Transform.rotate(
-                angle: percent * 0.3,
-                child: Opacity(
-                  opacity: lerpDouble(0.8, 0.0, percent)!,
-                  child: Container(
-                    width: 50,
-                    height: 50,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12),
-                      gradient: LinearGradient(
-                        colors: [
-                          theme.colorScheme.secondary.withOpacity(0.1),
-                          theme.colorScheme.secondary.withOpacity(0.03),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
+            // Premium gradient background
             Positioned.fill(
-              child: SafeArea(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: Row(
-                    children: [
-                      GestureDetector(
-                        onTap: () {
-                          Scaffold.of(context).openDrawer();
-                        },
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      Color.lerp(
+                        const Color(0xFF6366F1), // Indigo
+                        const Color(0xFF8B5CF6), // Purple
+                        percent * 0.3,
+                      )!,
+                      Color.lerp(
+                        const Color(0xFF8B5CF6), // Purple
+                        const Color(0xFFA855F7), // Light Purple
+                        percent * 0.5,
+                      )!,
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
+            // Animated decorative circles
+            Positioned(
+              right: -80,
+              top: -60,
+              child: AnimatedOpacity(
+                duration: const Duration(milliseconds: 300),
+                opacity: decorOpacity * 0.4,
+                child: TweenAnimationBuilder<double>(
+                  tween: Tween(begin: 0.0, end: 1.0),
+                  duration: const Duration(seconds: 3),
+                  builder: (context, value, child) {
+                    return Transform.scale(
+                      scale: 0.9 + (math.sin(value * math.pi * 2) * 0.1),
+                      child: Container(
+                        width: 250,
+                        height: 250,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: RadialGradient(
+                            colors: [
+                              Colors.white.withOpacity(0.15),
+                              Colors.white.withOpacity(0.05),
+                              Colors.transparent,
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+
+            Positioned(
+              left: -40,
+              top: topPadding + 20,
+              child: AnimatedOpacity(
+                duration: const Duration(milliseconds: 300),
+                opacity: decorOpacity * 0.3,
+                child: TweenAnimationBuilder<double>(
+                  tween: Tween(begin: 0.0, end: 1.0),
+                  duration: const Duration(seconds: 4),
+                  builder: (context, value, child) {
+                    return Transform.scale(
+                      scale: 0.8 + (math.cos(value * math.pi * 2) * 0.1),
+                      child: Container(
+                        width: 150,
+                        height: 150,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: RadialGradient(
+                            colors: [
+                              Colors.white.withOpacity(0.12),
+                              Colors.white.withOpacity(0.04),
+                              Colors.transparent,
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+
+            // Floating particles effect
+            Positioned(
+              right: 60,
+              bottom: 50,
+              child: AnimatedOpacity(
+                duration: const Duration(milliseconds: 300),
+                opacity: decorOpacity * 0.5,
+                child: TweenAnimationBuilder<double>(
+                  tween: Tween(begin: 0.0, end: 1.0),
+                  duration: const Duration(seconds: 2),
+                  builder: (context, value, child) {
+                    return Transform.translate(
+                      offset: Offset(
+                        math.sin(value * math.pi * 2) * 5,
+                        math.cos(value * math.pi * 2) * 5,
+                      ),
+                      child: Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.white.withOpacity(0.6),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.white.withOpacity(0.3),
+                              blurRadius: 8,
+                              spreadRadius: 2,
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+
+            Positioned(
+              left: 100,
+              top: topPadding + 30,
+              child: AnimatedOpacity(
+                duration: const Duration(milliseconds: 300),
+                opacity: decorOpacity * 0.4,
+                child: TweenAnimationBuilder<double>(
+                  tween: Tween(begin: 0.0, end: 1.0),
+                  duration: const Duration(milliseconds: 2500),
+                  builder: (context, value, child) {
+                    return Transform.translate(
+                      offset: Offset(
+                        math.cos(value * math.pi * 2) * 8,
+                        math.sin(value * math.pi * 2) * 8,
+                      ),
+                      child: Container(
+                        width: 6,
+                        height: 6,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.white.withOpacity(0.5),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.white.withOpacity(0.3),
+                              blurRadius: 6,
+                              spreadRadius: 1,
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+
+            // Shimmer effect overlay
+            Positioned.fill(
+              child: AnimatedOpacity(
+                duration: const Duration(milliseconds: 300),
+                opacity: decorOpacity * 0.3,
+                child: TweenAnimationBuilder<double>(
+                  tween: Tween(begin: -1.0, end: 2.0),
+                  duration: const Duration(seconds: 3),
+                  builder: (context, value, child) {
+                    return Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          stops: [
+                            (value - 0.3).clamp(0.0, 1.0),
+                            value.clamp(0.0, 1.0),
+                            (value + 0.3).clamp(0.0, 1.0),
+                          ],
+                          colors: [
+                            Colors.transparent,
+                            Colors.white.withOpacity(0.1),
+                            Colors.transparent,
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+
+            Positioned(
+              left: 24,
+              right: 24,
+              bottom: 12 + verticalShift,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  TweenAnimationBuilder<double>(
+                    tween: Tween(begin: 0.0, end: 1.0),
+                    duration: const Duration(milliseconds: 800),
+                    curve: Curves.easeOutBack,
+                    builder: (context, value, child) {
+                      return Transform.scale(
+                        scale: value,
                         child: Container(
                           width: avatarSize,
                           height: avatarSize,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [
+                                Colors.white.withOpacity(0.3),
+                                Colors.white.withOpacity(0.1),
+                              ],
+                            ),
                             boxShadow: [
                               BoxShadow(
-                                color: theme.primaryColor.withOpacity(0.15),
+                                color: Colors.white.withOpacity(0.3),
+                                blurRadius: 20,
+                                spreadRadius: 2,
+                                offset: const Offset(0, 4),
+                              ),
+                              BoxShadow(
+                                color: const Color(0xFF6366F1).withOpacity(0.2),
+                                blurRadius: 15,
+                                spreadRadius: -2,
+                                offset: const Offset(0, 8),
+                              ),
+                            ],
+                          ),
+                          padding: const EdgeInsets.all(3),
+                          child: Container(
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: Colors.white.withOpacity(0.4),
+                                width: 2,
+                              ),
+                            ),
+                            child: ClipOval(
+                              child: CachedNetworkImage(
+                                imageUrl:
+                                    (userImage != null && userImage!.isNotEmpty)
+                                    ? userImage!
+                                    : 'https://ui-avatars.com/api/?name=${userName.replaceAll(' ', '+')}&background=6366F1&color=fff&size=128',
+                                fit: BoxFit.cover,
+                                placeholder: (context, url) =>
+                                    Shimmer.fromColors(
+                                      baseColor: const Color(
+                                        0xFF6366F1,
+                                      ).withOpacity(0.3),
+                                      highlightColor: Colors.white.withOpacity(
+                                        0.5,
+                                      ),
+                                      child: Container(
+                                        color: Colors.white.withOpacity(0.2),
+                                      ),
+                                    ),
+                                errorWidget: (context, url, error) => Container(
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                      colors: [
+                                        Colors.white.withOpacity(0.3),
+                                        Colors.white.withOpacity(0.1),
+                                      ],
+                                    ),
+                                  ),
+                                  child: Center(
+                                    child: Text(
+                                      userName.isNotEmpty
+                                          ? userName[0].toUpperCase()
+                                          : '?',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: avatarSize * 0.4,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+
+                  const SizedBox(width: 14),
+
+                  Expanded(
+                    child: TweenAnimationBuilder<double>(
+                      tween: Tween(begin: 0.0, end: 1.0),
+                      duration: const Duration(milliseconds: 600),
+                      curve: Curves.easeOut,
+                      builder: (context, value, child) {
+                        return Transform.translate(
+                          offset: Offset((1 - value) * 20, 0),
+                          child: Opacity(
+                            opacity: value,
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                if (welcomeOpacity > 0)
+                                  Padding(
+                                    padding: const EdgeInsets.only(bottom: 4),
+                                    child: Opacity(
+                                      opacity: welcomeOpacity,
+                                      child: Transform.translate(
+                                        offset: Offset(0, -10 * percent),
+                                        child: Text(
+                                          'Welcome Back,',
+                                          style: TextStyle(
+                                            color: Colors.white.withOpacity(
+                                              0.85,
+                                            ),
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w600,
+                                            height: 1,
+                                            letterSpacing: 0.3,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                Text(
+                                  userName,
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: nameSize,
+                                    fontWeight: FontWeight.w800,
+                                    height: 1.1,
+                                    letterSpacing: -0.3,
+                                    shadows: [
+                                      Shadow(
+                                        color: Colors.black.withOpacity(0.1),
+                                        offset: const Offset(0, 2),
+                                        blurRadius: 4,
+                                      ),
+                                    ],
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  TweenAnimationBuilder<double>(
+                    tween: Tween(begin: 0.0, end: 1.0),
+                    duration: const Duration(milliseconds: 1000),
+                    curve: Curves.elasticOut,
+                    builder: (context, value, child) {
+                      return Transform.scale(
+                        scale: value,
+                        child: Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [
+                                Colors.white.withOpacity(0.25),
+                                Colors.white.withOpacity(0.15),
+                              ],
+                            ),
+                            border: Border.all(
+                              color: Colors.white.withOpacity(0.3),
+                              width: 1.5,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.white.withOpacity(0.2),
                                 blurRadius: 12,
                                 offset: const Offset(0, 4),
                               ),
-                            ],
-                          ),
-                          child: Stack(
-                            children: [
-                              Container(
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: theme.primaryColor.withOpacity(0.2),
-                                    width: 2.5,
-                                  ),
-                                ),
-                              ),
-                              Container(
-                                margin: const EdgeInsets.all(3),
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: Colors.white,
-                                    width: 2,
-                                  ),
-                                ),
-                                child: ClipOval(
-                                  child: Image.network(
-                                    (userImage != null && userImage!.isNotEmpty)
-                                        ? userImage!
-                                        : 'https://ui-avatars.com/api/?name=${Uri.encodeComponent(userName)}&background=6366F1&color=fff&size=128',
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (context, error, stackTrace) {
-                                      return Container(
-                                        color: theme.primaryColor.withOpacity(
-                                          0.1,
-                                        ),
-                                        child: Icon(
-                                          Icons.person,
-                                          color: theme.primaryColor,
-                                          size: avatarSize * 0.5,
-                                        ),
-                                      );
-                                    },
-                                  ),
-                                ),
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.1),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
                               ),
                             ],
                           ),
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            if (percent < 0.5)
-                              Padding(
-                                padding: const EdgeInsets.only(bottom: 2),
-                                child: Text(
-                                  'Welcome Back,',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.clip,
-                                  style: TextStyle(
-                                    color: theme.primaryColor.withOpacity(0.65),
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                    letterSpacing: 0.3,
+                          child: Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              onTap: () {},
+                              borderRadius: BorderRadius.circular(22),
+                              splashColor: Colors.white.withOpacity(0.3),
+                              highlightColor: Colors.white.withOpacity(0.2),
+                              child: Center(
+                                child: SvgPicture.asset(
+                                  'assets/icons/notification.svg',
+                                  width: 22,
+                                  height: 22,
+                                  colorFilter: ColorFilter.mode(
+                                    Colors.white.withOpacity(0.95),
+                                    BlendMode.srcIn,
                                   ),
                                 ),
                               ),
-                            Text(
-                              userName,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: const Color(0xFF1A1A1A),
-                                fontSize: nameSize,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: -0.5,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Container(
-                        width: 44,
-                        height: 44,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Colors.white.withOpacity(0.95),
-                          border: Border.all(
-                            color: theme.primaryColor.withOpacity(0.15),
-                            width: 1.5,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: theme.primaryColor.withOpacity(0.08),
-                              blurRadius: 10,
-                              offset: const Offset(0, 3),
-                            ),
-                          ],
-                        ),
-                        child: Material(
-                          color: Colors.transparent,
-                          child: InkWell(
-                            onTap: () {},
-                            borderRadius: BorderRadius.circular(22),
-                            child: Icon(
-                              Icons.notifications_none_rounded,
-                              color: theme.primaryColor.withOpacity(0.85),
-                              size: 22,
                             ),
                           ),
                         ),
-                      ),
-                    ],
+                      );
+                    },
                   ),
-                ),
+                ],
               ),
             ),
           ],
@@ -324,15 +486,21 @@ class DashboardHeader extends SliverPersistentHeaderDelegate {
     );
   }
 
-  @override
-  double get maxExtent => 150.0 + topPadding;
+  double _lerpDouble(double a, double b, double t) {
+    return a + (b - a) * t;
+  }
 
   @override
-  double get minExtent => kToolbarHeight + topPadding;
+  double get maxExtent => 100.0 + topPadding;
+
+  @override
+  double get minExtent => kToolbarHeight + topPadding + 20;
 
   @override
   bool shouldRebuild(covariant DashboardHeader oldDelegate) =>
-      userName != oldDelegate.userName || userImage != oldDelegate.userImage;
+      userName != oldDelegate.userName ||
+      userImage != oldDelegate.userImage ||
+      topPadding != oldDelegate.topPadding;
 }
 
 class StatsGlassCard extends StatelessWidget {

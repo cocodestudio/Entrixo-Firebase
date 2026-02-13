@@ -1,4 +1,8 @@
+import 'package:entrixo/admin/add_student_screen.dart';
+import 'package:entrixo/admin/lab_management_screen.dart';
+import 'package:entrixo/admin/qr_generator_screen.dart';
 import 'package:entrixo/admin/session_management_screen.dart';
+import 'package:entrixo/admin/student_list_screen.dart';
 import 'package:flutter/material.dart';
 import 'academic_setup_screen.dart';
 
@@ -13,8 +17,9 @@ class AdminToolsScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: const Color(0xFFF7F8FA),
       body: CustomScrollView(
-        physics: const ClampingScrollPhysics(),
+        physics: const BouncingScrollPhysics(), // Premium bouncy scroll
         slivers: [
+          // --- Header Section ---
           SliverPadding(
             padding: EdgeInsets.fromLTRB(24, topPadding + 20, 24, 20),
             sliver: SliverToBoxAdapter(
@@ -24,13 +29,13 @@ class AdminToolsScreen extends StatelessWidget {
                   const Text(
                     "Academic Tools",
                     style: TextStyle(
-                      fontSize: 20,
+                      fontSize: 24, // Thoda size badhaya premium feel ke liye
                       fontWeight: FontWeight.w900,
                       color: Color(0xFF1A1A1A),
                       letterSpacing: -0.5,
                     ),
                   ),
-                  const SizedBox(height: 1),
+                  const SizedBox(height: 4),
                   Text(
                     "Manage sessions, academics & reports",
                     style: TextStyle(
@@ -43,24 +48,35 @@ class AdminToolsScreen extends StatelessWidget {
               ),
             ),
           ),
+
+          // --- Hero Action (Start Session) ---
           SliverPadding(
             padding: const EdgeInsets.symmetric(horizontal: 24),
             sliver: SliverList(
               delegate: SliverChildListDelegate([
                 _HeroActionCard(
-                  title: "Start New Session",
-                  subtitle: "Generate live QR for attendance",
+                  title: "QR Code Generates",
+                  subtitle: "Generate QR for attendance",
                   icon: Icons.qr_code_scanner_rounded,
                   gradientColors: [
                     theme.primaryColor,
                     theme.primaryColor.withBlue(200),
                   ],
-                  onTap: () {},
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const QRGeneratorScreen(),
+                      ),
+                    );
+                  },
                 ),
                 const SizedBox(height: 20),
               ]),
             ),
           ),
+
+          // --- Core Management (Setup & Add Student) ---
           SliverPadding(
             padding: const EdgeInsets.symmetric(horizontal: 24),
             sliver: SliverGrid(
@@ -86,15 +102,24 @@ class AdminToolsScreen extends StatelessWidget {
                   },
                 ),
                 _GridActionCard(
-                  title: "Student\nDatabase",
-                  subtitle: "Profiles",
-                  icon: Icons.people_outline_rounded,
+                  title: "Add\nStudent", // Name updated for clarity
+                  subtitle: "Manual Entry",
+                  icon: Icons.person_add_alt_1_rounded,
                   gradientColors: const [Color(0xFF576574), Color(0xFF8395A7)],
-                  onTap: () {},
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const AddStudentScreen(),
+                      ),
+                    );
+                  },
                 ),
               ]),
             ),
           ),
+
+          // --- Attendance Report Banner ---
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
             sliver: SliverToBoxAdapter(
@@ -107,6 +132,8 @@ class AdminToolsScreen extends StatelessWidget {
               ),
             ),
           ),
+
+          // --- EXTENDED Grid Section (More Cards Added) ---
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(24, 16, 24, 120),
             sliver: SliverGrid(
@@ -117,6 +144,7 @@ class AdminToolsScreen extends StatelessWidget {
                 childAspectRatio: 1.1,
               ),
               delegate: SliverChildListDelegate([
+                // 1. Academic Sessions
                 _GridActionCard(
                   title: "Academic\nSessions",
                   subtitle: "Create & Manage",
@@ -132,27 +160,87 @@ class AdminToolsScreen extends StatelessWidget {
                     );
                   },
                 ),
+
+                // 2. Student Directory (LINKED)
                 _GridActionCard(
-                  title: "Department\nLog",
-                  subtitle: "Activity Tracking",
-                  icon: Icons.assignment_outlined,
-                  gradientColors: const [Color(0xFF222f3e), Color(0xFF576574)],
+                  title: "Student\nDirectory",
+                  subtitle: "View & Edit List",
+                  icon: Icons.recent_actors_rounded,
+                  gradientColors: const [Color(0xFF00b894), Color(0xFF55efc4)],
                   isSmall: true,
-                  onTap: () {},
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const StudentListScreen(),
+                      ),
+                    );
+                  },
                 ),
+
+                // 3. Faculty
                 _GridActionCard(
-                  title: "Faculty",
+                  title: "Faculty\nMembers",
                   subtitle: "Manage Staff",
                   icon: Icons.school_outlined,
                   gradientColors: const [Color(0xFFee5253), Color(0xFFff6b6b)],
                   isSmall: true,
                   onTap: () {},
                 ),
+
+                // 4. Department Log
                 _GridActionCard(
-                  title: "Broadcast",
-                  subtitle: "Notices",
-                  icon: Icons.campaign_outlined,
-                  gradientColors: const [Color(0xFFff9f43), Color(0xFFfeca57)],
+                  title: "Lab\nManage",
+                  subtitle: "Computer Manages",
+                  icon: Icons.assignment_outlined,
+                  gradientColors: const [Color(0xFF2d3436), Color(0xFF636e72)],
+                  isSmall: true,
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const AcademicEquipScreen(),
+                      ),
+                    );
+                  },
+                ),
+
+                // 5. Broadcast (Notices)
+                _GridActionCard(
+                  title: "Broadcast\nNotice",
+                  subtitle: "Alert Everyone",
+                  icon: Icons.campaign_rounded,
+                  gradientColors: const [Color(0xFFe17055), Color(0xFFfab1a0)],
+                  isSmall: true,
+                  onTap: () {},
+                ),
+
+                // 6. Timetable (New)
+                _GridActionCard(
+                  title: "Class\nTimetable",
+                  subtitle: "Schedule",
+                  icon: Icons.calendar_month_rounded,
+                  gradientColors: const [Color(0xFF6c5ce7), Color(0xFFa29bfe)],
+                  isSmall: true,
+                  onTap: () {},
+                ),
+
+                // 7. Exams (New)
+                _GridActionCard(
+                  title: "Exams &\nResults",
+                  subtitle: "Grading",
+                  icon: Icons.grade_rounded,
+                  gradientColors: const [Color(0xFF0984e3), Color(0xFF74b9ff)],
+                  isSmall: true,
+                  onTap: () {},
+                ),
+
+                // 8. Holidays (New)
+                _GridActionCard(
+                  title: "Holiday\nCalendar",
+                  subtitle: "Events",
+                  icon: Icons.celebration_rounded,
+                  gradientColors: const [Color(0xFFe84393), Color(0xFFfd79a8)],
                   isSmall: true,
                   onTap: () {},
                 ),

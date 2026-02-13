@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../home/dashboard_screen.dart';
+import '../screens/student_setup_screen.dart';
 import '../utils/custom_toast.dart';
 import '../utils/nav_utils.dart';
 import '../widgets/geometric_loader.dart';
@@ -98,8 +99,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       _verificationId,
       otp,
       "student",
-      () {
-        NavUtils.navigate(context, const DashboardScreen());
+      (bool isSetupDone) {
+        if (isSetupDone) {
+          NavUtils.pushReplacement(context, const DashboardScreen());
+        } else {
+          NavUtils.pushReplacement(context, const StudentSetupScreen());
+        }
       },
     );
   }

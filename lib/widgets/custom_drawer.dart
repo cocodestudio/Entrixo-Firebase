@@ -1,6 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../auth/auth_controller.dart';
 import '../screens/profile_controller.dart';
 import '../screens/profile_screen.dart';
 
@@ -48,7 +49,7 @@ class CustomDrawer extends ConsumerWidget {
                 _buildProfileHeader(context, profileState, theme, size),
                 const SizedBox(height: 8),
                 Expanded(child: _buildMenuItems(context, theme)),
-                _buildLogoutButton(context, theme),
+                _buildLogoutButton(context, ref, theme),
               ],
             ),
           ),
@@ -305,7 +306,11 @@ class CustomDrawer extends ConsumerWidget {
     );
   }
 
-  Widget _buildLogoutButton(BuildContext context, ThemeData theme) {
+  Widget _buildLogoutButton(
+    BuildContext context,
+    WidgetRef ref,
+    ThemeData theme,
+  ) {
     return Padding(
       padding: EdgeInsets.fromLTRB(
         20,
@@ -316,7 +321,7 @@ class CustomDrawer extends ConsumerWidget {
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: () {},
+          onTap: () => _showLogoutDialog(context, ref),
           borderRadius: BorderRadius.circular(20),
           child: Container(
             padding: const EdgeInsets.symmetric(vertical: 18),
@@ -351,6 +356,41 @@ class CustomDrawer extends ConsumerWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  void _showLogoutDialog(BuildContext context, WidgetRef ref) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text(
+          "Logout",
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        content: const Text(
+          "Are you sure you want to exit? Your session will be cleared.",
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Cancel", style: TextStyle(color: Colors.grey)),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              ref.read(authControllerProvider.notifier).logout(context);
+            },
+            child: const Text(
+              "Logout",
+              style: TextStyle(
+                color: Color(0xFFFF4B4B),
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

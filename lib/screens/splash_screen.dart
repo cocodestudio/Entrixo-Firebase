@@ -1,9 +1,11 @@
 import 'dart:async';
+import 'package:entrixo/screens/student_setup_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../auth/login_screen.dart';
 import '../home/dashboard_screen.dart';
 import '../widgets/predictive_transition.dart';
 import 'onboarding_screen.dart';
@@ -48,55 +50,59 @@ class _SplashScreenState extends State<SplashScreen>
     Widget nextScreen = const OnboardingScreen();
 
     try {
-      try {
-        await SharedPreferences.getInstance();
-      } catch (e) {
-        debugPrint("⚠️ Prefs Error: $e");
-      }
-
+      final prefs = await SharedPreferences.getInstance();
+      final bool isFirstTime = prefs.getBool('isFirstTime') ?? true;
       final auth = FirebaseAuth.instance;
       User? user = auth.currentUser;
 
-      if (user == null) {
-        try {
-          user = await auth
-              .authStateChanges()
-              .timeout(const Duration(seconds: 1))
-              .first;
-        } catch (_) {}
-      }
-
-      if (user != null) {
-        debugPrint("✅ User Detected: ${user.uid}");
-        _fetchAndSyncRole(user.uid);
-
-        nextScreen = const DashboardScreen();
-      } else {
-        debugPrint("🔒 No User Found, going to Onboarding");
+      if (isFirstTime) {
         nextScreen = const OnboardingScreen();
+      } else if (user != null) {
+        nextScreen = await _determineUserDestination(user.uid);
+      } else {
+        nextScreen = const LoginScreen();
       }
     } catch (e) {
-      debugPrint("❌ Critical Auth Error: $e");
       nextScreen = const OnboardingScreen();
     } finally {
       _navigate(nextScreen, startTime);
     }
   }
 
-  Future<void> _fetchAndSyncRole(String uid) async {
+  Future<Widget> _determineUserDestination(String uid) async {
     try {
+      final prefs = await SharedPreferences.getInstance();
+      final bool? localSetupDone = prefs.getBool('setup_done');
+      final String? localRole = prefs.getString('user_role');
+
+      if (localSetupDone == true) {
+        return const DashboardScreen();
+      }
+
       final doc = await FirebaseFirestore.instance
           .collection('users')
           .doc(uid)
-          .get(const GetOptions(source: Source.server))
-          .timeout(const Duration(seconds: 2));
+          .get(const GetOptions(source: Source.serverAndCache))
+          .timeout(const Duration(seconds: 3));
 
-      if (doc.exists) {
-        final role = doc.data()?['role'] ?? 'student';
-        final prefs = await SharedPreferences.getInstance();
+      if (doc.exists && doc.data() != null) {
+        final data = doc.data()!;
+        final String role = data['role'] ?? 'student';
+        final bool isSetupCompleted = data['isSetupCompleted'] ?? false;
+
         await prefs.setString('user_role', role);
+        await prefs.setBool('setup_done', isSetupCompleted);
+
+        if (role == 'admin') return const DashboardScreen();
+        return isSetupCompleted
+            ? const DashboardScreen()
+            : const StudentSetupScreen();
+      } else {
+        return const StudentSetupScreen();
       }
-    } catch (_) {}
+    } catch (e) {
+      return const StudentSetupScreen();
+    }
   }
 
   void _navigate(Widget nextScreen, DateTime startTime) {
@@ -148,7 +154,6 @@ class _SplashScreenState extends State<SplashScreen>
           height: size.height,
           child: Stack(
             children: [
-              // Background Shapes
               Positioned(
                 top: -size.width * 0.2,
                 right: -size.width * 0.2,
@@ -173,8 +178,6 @@ class _SplashScreenState extends State<SplashScreen>
                   ),
                 ),
               ),
-
-              // Logo Animation
               Center(
                 child: AnimatedBuilder(
                   animation: _controller,
@@ -193,8 +196,6 @@ class _SplashScreenState extends State<SplashScreen>
                   },
                 ),
               ),
-
-              // Footer Branding
               Positioned(
                 bottom: 50.0,
                 left: 0,

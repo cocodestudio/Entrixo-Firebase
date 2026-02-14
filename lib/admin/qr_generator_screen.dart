@@ -365,12 +365,11 @@ class _QRGeneratorScreenState extends State<QRGeneratorScreen> {
                     itemBuilder: (context, index) {
                       final pcNumber =
                           "PC-${(index + 1).toString().padLeft(2, '0')}";
-                      final qrData = jsonEncode({
-                        'labId': _selectedLabId,
-                        'pcId': pcNumber,
-                        'labName': _selectedLabName,
-                        'type': 'static_pc_qr',
-                      });
+
+                      final String uniqueKey =
+                          "KEY_${_selectedLabId}_${pcNumber}_${DateTime.now().day}";
+                      final String qrData =
+                          "ENTRIXO_SECURE|SESSION_ID_HERE|SUBJECT_ID_HERE|$uniqueKey|${DateTime.now().millisecondsSinceEpoch}";
 
                       return Container(
                         decoration: BoxDecoration(

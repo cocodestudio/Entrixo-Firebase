@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../utils/custom_toast.dart';
 import '../widgets/geometric_loader.dart';
@@ -22,6 +23,7 @@ class _AcademicSetupScreenState extends State<AcademicSetupScreen> {
   String _viewingSessionName = "Loading...";
 
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
 
   Future<void> _addCourse(String name, int years) async {
     if (name.trim().isEmpty) {
@@ -96,6 +98,7 @@ class _AcademicSetupScreenState extends State<AcademicSetupScreen> {
         'sessionId': _activeSessionId,
         'schedule': schedule,
         'createdAt': FieldValue.serverTimestamp(),
+        'createdBy': _auth.currentUser?.uid,
       });
       if (mounted) Navigator.pop(context);
       _showSnack("Lab & Schedule added successfully!");

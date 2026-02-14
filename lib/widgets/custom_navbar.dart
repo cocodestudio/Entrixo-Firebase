@@ -14,29 +14,28 @@ class CustomNavBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final size = MediaQuery.of(context).size;
+    final bottomPadding = MediaQuery.of(context).padding.bottom;
 
-    return Container(
-      height: 70,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(35),
-        boxShadow: [
-          BoxShadow(
-            color: theme.primaryColor.withOpacity(0.06),
-            blurRadius: 24,
-            offset: const Offset(0, 8),
-          ),
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 12,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(35),
+    return Align(
+      alignment: Alignment.bottomCenter,
+      child: Container(
+        width: size.width * 0.45,
+        height: 60,
+        margin: EdgeInsets.only(bottom: bottomPadding > 0 ? bottomPadding : 5),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(35),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 25,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
             NavBarItem(
               iconPath: 'assets/icons/home.svg',
@@ -50,13 +49,6 @@ class CustomNavBar extends StatelessWidget {
               label: 'Tools',
               isSelected: currentIndex == 1,
               onTap: () => onTap(1),
-              theme: theme,
-            ),
-            NavBarItem(
-              iconPath: 'assets/icons/profile.svg',
-              label: 'Profile',
-              isSelected: currentIndex == 2,
-              onTap: () => onTap(2),
               theme: theme,
             ),
           ],
@@ -98,65 +90,37 @@ class _NavBarItemState extends State<NavBarItem> {
       onTap: widget.onTap,
       behavior: HitTestBehavior.opaque,
       child: AnimatedScale(
-        scale: _isPressed ? 0.92 : 1.0,
-        duration: const Duration(milliseconds: 150),
-        curve: Curves.easeOut,
+        scale: _isPressed ? 0.9 : 1.0,
+        duration: const Duration(milliseconds: 100),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 300),
           curve: Curves.easeOutCubic,
-          padding: EdgeInsets.symmetric(
-            horizontal: widget.isSelected ? 20 : 12,
-            vertical: 10,
-          ),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
           decoration: BoxDecoration(
             color: widget.isSelected
-                ? widget.theme.primaryColor.withOpacity(0.12)
+                ? widget.theme.primaryColor.withOpacity(0.1)
                 : Colors.transparent,
-            borderRadius: BorderRadius.circular(25),
+            borderRadius: BorderRadius.circular(20),
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              SvgPicture.asset(
-                widget.iconPath,
-                width: 22,
-                height: 22,
-                colorFilter: ColorFilter.mode(
-                  widget.isSelected
-                      ? widget.theme.primaryColor
-                      : const Color(0xFF9CA3AF),
-                  BlendMode.srcIn,
-                ),
-                placeholderBuilder: (context) => Icon(
-                  widget.label == 'Home'
-                      ? Icons.home_rounded
-                      : widget.label == 'Tools'
-                      ? Icons.show_chart_rounded
-                      : Icons.person_rounded,
-                  color: widget.isSelected
-                      ? widget.theme.primaryColor
-                      : const Color(0xFF9CA3AF),
-                  size: 22,
-                ),
-              ),
-              AnimatedSize(
-                duration: const Duration(milliseconds: 300),
-                curve: Curves.easeOutCubic,
-                child: widget.isSelected
-                    ? Padding(
-                        padding: const EdgeInsets.only(left: 8.0),
-                        child: Text(
-                          widget.label,
-                          style: TextStyle(
-                            color: widget.theme.primaryColor,
-                            fontWeight: FontWeight.w800,
-                            fontSize: 14,
-                          ),
-                        ),
-                      )
-                    : const SizedBox.shrink(),
-              ),
-            ],
+          child: SvgPicture.asset(
+            widget.iconPath,
+            width: 24,
+            height: 24,
+            colorFilter: ColorFilter.mode(
+              widget.isSelected
+                  ? widget.theme.primaryColor
+                  : const Color(0xFF9CA3AF),
+              BlendMode.srcIn,
+            ),
+            placeholderBuilder: (context) => Icon(
+              widget.label == 'Home'
+                  ? Icons.home_rounded
+                  : Icons.grid_view_rounded,
+              color: widget.isSelected
+                  ? widget.theme.primaryColor
+                  : const Color(0xFF9CA3AF),
+              size: 24,
+            ),
           ),
         ),
       ),

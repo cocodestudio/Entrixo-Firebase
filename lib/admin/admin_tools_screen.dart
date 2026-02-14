@@ -1,5 +1,7 @@
 import 'package:entrixo/admin/add_student_screen.dart';
+import 'package:entrixo/admin/admin_manual_attendance.dart';
 import 'package:entrixo/admin/lab_management_screen.dart';
+import 'package:entrixo/admin/manage_faculty_screen.dart';
 import 'package:entrixo/admin/qr_generator_screen.dart';
 import 'package:entrixo/admin/session_management_screen.dart';
 import 'package:entrixo/admin/student_list_screen.dart';
@@ -17,9 +19,8 @@ class AdminToolsScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: const Color(0xFFF7F8FA),
       body: CustomScrollView(
-        physics: const BouncingScrollPhysics(), // Premium bouncy scroll
+        physics: const ClampingScrollPhysics(),
         slivers: [
-          // --- Header Section ---
           SliverPadding(
             padding: EdgeInsets.fromLTRB(24, topPadding + 20, 24, 20),
             sliver: SliverToBoxAdapter(
@@ -29,7 +30,7 @@ class AdminToolsScreen extends StatelessWidget {
                   const Text(
                     "Academic Tools",
                     style: TextStyle(
-                      fontSize: 24, // Thoda size badhaya premium feel ke liye
+                      fontSize: 24,
                       fontWeight: FontWeight.w900,
                       color: Color(0xFF1A1A1A),
                       letterSpacing: -0.5,
@@ -49,7 +50,6 @@ class AdminToolsScreen extends StatelessWidget {
             ),
           ),
 
-          // --- Hero Action (Start Session) ---
           SliverPadding(
             padding: const EdgeInsets.symmetric(horizontal: 24),
             sliver: SliverList(
@@ -76,7 +76,6 @@ class AdminToolsScreen extends StatelessWidget {
             ),
           ),
 
-          // --- Core Management (Setup & Add Student) ---
           SliverPadding(
             padding: const EdgeInsets.symmetric(horizontal: 24),
             sliver: SliverGrid(
@@ -102,7 +101,7 @@ class AdminToolsScreen extends StatelessWidget {
                   },
                 ),
                 _GridActionCard(
-                  title: "Add\nStudent", // Name updated for clarity
+                  title: "Add\nStudent",
                   subtitle: "Manual Entry",
                   icon: Icons.person_add_alt_1_rounded,
                   gradientColors: const [Color(0xFF576574), Color(0xFF8395A7)],
@@ -119,7 +118,6 @@ class AdminToolsScreen extends StatelessWidget {
             ),
           ),
 
-          // --- Attendance Report Banner ---
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
             sliver: SliverToBoxAdapter(
@@ -133,7 +131,6 @@ class AdminToolsScreen extends StatelessWidget {
             ),
           ),
 
-          // --- EXTENDED Grid Section (More Cards Added) ---
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(24, 16, 24, 120),
             sliver: SliverGrid(
@@ -144,7 +141,6 @@ class AdminToolsScreen extends StatelessWidget {
                 childAspectRatio: 1.1,
               ),
               delegate: SliverChildListDelegate([
-                // 1. Academic Sessions
                 _GridActionCard(
                   title: "Academic\nSessions",
                   subtitle: "Create & Manage",
@@ -161,7 +157,6 @@ class AdminToolsScreen extends StatelessWidget {
                   },
                 ),
 
-                // 2. Student Directory (LINKED)
                 _GridActionCard(
                   title: "Student\nDirectory",
                   subtitle: "View & Edit List",
@@ -185,7 +180,14 @@ class AdminToolsScreen extends StatelessWidget {
                   icon: Icons.school_outlined,
                   gradientColors: const [Color(0xFFee5253), Color(0xFFff6b6b)],
                   isSmall: true,
-                  onTap: () {},
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const ManageFacultyScreen(),
+                      ),
+                    );
+                  },
                 ),
 
                 // 4. Department Log
@@ -207,12 +209,20 @@ class AdminToolsScreen extends StatelessWidget {
 
                 // 5. Broadcast (Notices)
                 _GridActionCard(
-                  title: "Broadcast\nNotice",
-                  subtitle: "Alert Everyone",
-                  icon: Icons.campaign_rounded,
+                  title: "Student\nAttendance",
+                  subtitle: "Manual attendance mark",
+                  icon: Icons.bar_chart_sharp,
                   gradientColors: const [Color(0xFFe17055), Color(0xFFfab1a0)],
                   isSmall: true,
-                  onTap: () {},
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) =>
+                            const AdminManualAttendanceScreen(),
+                      ),
+                    );
+                  },
                 ),
 
                 // 6. Timetable (New)

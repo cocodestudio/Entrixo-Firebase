@@ -17,9 +17,11 @@ class NetworkManager extends StatefulWidget {
   State<NetworkManager> createState() => _NetworkManagerState();
 }
 
-class _NetworkManagerState extends State<NetworkManager> with WidgetsBindingObserver {
+class _NetworkManagerState extends State<NetworkManager>
+    with WidgetsBindingObserver {
   final InternetConnection _internetConnection = InternetConnection();
   StreamSubscription<InternetStatus>? _internetSubscription;
+
   bool _isNoInternetScreenShown = false;
   bool _isAppInForeground = true;
 
@@ -41,7 +43,7 @@ class _NetworkManagerState extends State<NetworkManager> with WidgetsBindingObse
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _isAppInForeground = true;
-      Future.delayed(const Duration(seconds: 1), () {
+      Future.delayed(const Duration(milliseconds: 1000), () {
         if (mounted && _isAppInForeground) {
           _validateConnection();
         }
@@ -64,7 +66,7 @@ class _NetworkManagerState extends State<NetworkManager> with WidgetsBindingObse
   }
 
   Future<void> _handleDisconnection() async {
-    await Future.delayed(const Duration(seconds: 3));
+    await Future.delayed(const Duration(seconds: 2));
 
     if (!mounted || !_isAppInForeground) return;
 
@@ -86,30 +88,37 @@ class _NetworkManagerState extends State<NetworkManager> with WidgetsBindingObse
   }
 
   void _showNoInternetScreen() {
-    if (_isNoInternetScreenShown || !_isAppInForeground) return;
+    if (_isNoInternetScreenShown) return;
+
+    final currentState = widget.navigatorKey.currentState;
+    if (currentState == null) return;
 
     _isNoInternetScreenShown = true;
-    widget.navigatorKey.currentState?.push(
-      PageRouteBuilder(
-        pageBuilder: (context, animation, secondaryAnimation) => NoInternetScreen(onRetry: _validateConnection),
-        transitionsBuilder: (context, animation, secondaryAnimation, child) {
-          return FadeTransition(opacity: animation, child: child);
-        },
-        transitionDuration: const Duration(milliseconds: 300),
-      ),
-    ).then((_) {
-      _isNoInternetScreenShown = false;
-    });
+
+    currentState
+        .push(
+          PageRouteBuilder(
+            settings: const RouteSettings(name: 'NO_INTERNET_SCREEN'),
+            pageBuilder: (context, animation, secondaryAnimation) =>
+                NoInternetScreen(onRetry: _validateConnection),
+            transitionsBuilder:
+                (context, animation, secondaryAnimation, child) {
+                  return FadeTransition(opacity: animation, child: child);
+                },
+            transitionDuration: const Duration(milliseconds: 400),
+          ),
+        )
+        .then((_) {
+          _isNoInternetScreenShown = false;
+        });
   }
 
   void _removeNoInternetScreen() {
-    if (_isNoInternetScreenShown && widget.navigatorKey.currentState != null) {
-      widget.navigatorKey.currentState!.popUntil((route) {
-        if (route.settings.name == null && _isNoInternetScreenShown) {
-          return false;
-        }
-        return true;
-      });
+    if (_isNoInternetScreenShown) {
+      final currentState = widget.navigatorKey.currentState;
+      if (currentState != null && currentState.canPop()) {
+        currentState.pop();
+      }
       _isNoInternetScreenShown = false;
     }
   }

@@ -64,24 +64,25 @@ class AuthController extends StateNotifier<bool> {
         } else {
           final String loginPhone = user.phoneNumber ?? "";
 
-          final manualQuery = await _firestore
+          final preApprovedQuery = await _firestore
               .collection('users')
               .where('phoneNumber', isEqualTo: loginPhone)
-              .where('isManualEntry', isEqualTo: true)
-              .limit(1)
               .get();
 
-          if (manualQuery.docs.isNotEmpty) {
-            final manualDoc = manualQuery.docs.first;
+          if (preApprovedQuery.docs.isNotEmpty) {
+            final manualDoc = preApprovedQuery.docs.first;
             final data = manualDoc.data() as Map<String, dynamic>;
+
             data['uid'] = user.uid;
+
             data['isManualEntry'] = false;
+            data['isPreApproved'] = false;
             data['mergedAt'] = FieldValue.serverTimestamp();
 
             await userDocRef.set(data);
             await manualDoc.reference.delete();
 
-            isSetupDone = true;
+            isSetupDone = data['isSetupCompleted'] ?? false;
           } else {
             await authRepository.saveUserData(role: role);
             isSetupDone = false;

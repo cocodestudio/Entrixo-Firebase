@@ -1,6 +1,8 @@
 import 'dart:ui';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shimmer/shimmer.dart';
 import '../auth/auth_controller.dart';
 import '../screens/profile_controller.dart';
 import '../screens/profile_screen.dart';
@@ -15,42 +17,38 @@ class CustomDrawer extends ConsumerWidget {
     final size = MediaQuery.of(context).size;
 
     return Drawer(
-      backgroundColor: Colors.transparent,
+      backgroundColor: Colors.white.withOpacity(0.01),
       elevation: 0,
       width: size.width * 0.85,
-      child: ClipRRect(
-        borderRadius: const BorderRadius.only(
-          topRight: Radius.circular(32),
-          bottomRight: Radius.circular(32),
-        ),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-          child: Container(
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.95),
-              borderRadius: const BorderRadius.only(
-                topRight: Radius.circular(32),
-                bottomRight: Radius.circular(32),
-              ),
-              border: Border.all(
-                color: Colors.white.withOpacity(0.4),
-                width: 1.5,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: theme.primaryColor.withOpacity(0.08),
-                  blurRadius: 40,
-                  offset: const Offset(8, 0),
+      child: PopScope(
+        canPop: true,
+        child: ClipRRect(
+          borderRadius: const BorderRadius.only(
+            topRight: Radius.circular(32),
+            bottomRight: Radius.circular(32),
+          ),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.92),
+                borderRadius: const BorderRadius.only(
+                  topRight: Radius.circular(32),
+                  bottomRight: Radius.circular(32),
                 ),
-              ],
-            ),
-            child: Column(
-              children: [
-                _buildProfileHeader(context, profileState, theme, size),
-                const SizedBox(height: 8),
-                Expanded(child: _buildMenuItems(context, theme)),
-                _buildLogoutButton(context, ref, theme),
-              ],
+                border: Border.all(
+                  color: Colors.white.withOpacity(0.4),
+                  width: 1.5,
+                ),
+              ),
+              child: Column(
+                children: [
+                  _buildProfileHeader(context, profileState, theme, size),
+                  const SizedBox(height: 8),
+                  Expanded(child: _buildMenuItems(context, theme)),
+                  _buildLogoutButton(context, ref, theme),
+                ],
+              ),
             ),
           ),
         ),
@@ -127,22 +125,26 @@ class CustomDrawer extends ConsumerWidget {
                     ],
                   ),
                   child: ClipOval(
-                    child: Image.network(
-                      (profileState.profileUrl != null &&
+                    child: CachedNetworkImage(
+                      imageUrl:
+                          (profileState.profileUrl != null &&
                               profileState.profileUrl!.isNotEmpty)
                           ? profileState.profileUrl!
                           : 'https://ui-avatars.com/api/?name=${Uri.encodeComponent(profileState.name.isEmpty ? "User" : profileState.name)}&background=6366F1&color=fff&size=256',
                       fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) {
-                        return Container(
-                          color: theme.primaryColor.withOpacity(0.1),
-                          child: Icon(
-                            Icons.person,
-                            color: theme.primaryColor,
-                            size: 48,
-                          ),
-                        );
-                      },
+                      placeholder: (context, url) => Shimmer.fromColors(
+                        baseColor: Colors.grey[300]!,
+                        highlightColor: Colors.grey[100]!,
+                        child: Container(color: Colors.white),
+                      ),
+                      errorWidget: (context, url, error) => Container(
+                        color: theme.primaryColor.withOpacity(0.1),
+                        child: Icon(
+                          Icons.person,
+                          color: theme.primaryColor,
+                          size: 48,
+                        ),
+                      ),
                     ),
                   ),
                 ),

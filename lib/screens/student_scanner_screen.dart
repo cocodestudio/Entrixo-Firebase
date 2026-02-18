@@ -3,22 +3,28 @@ import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:intl/intl.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:permission_handler/permission_handler.dart';
 
-class StudentScannerScreen extends StatefulWidget {
+import '../home/student_dashboard_components.dart';
+import 'attendance_screen.dart';
+
+class StudentScannerScreen extends ConsumerStatefulWidget {
   const StudentScannerScreen({super.key});
 
   @override
-  State<StudentScannerScreen> createState() => _StudentScannerScreenState();
+  ConsumerState<StudentScannerScreen> createState() =>
+      _StudentScannerScreenState();
 }
 
-class _StudentScannerScreenState extends State<StudentScannerScreen>
+class _StudentScannerScreenState extends ConsumerState<StudentScannerScreen>
     with WidgetsBindingObserver {
   final MobileScannerController _controller = MobileScannerController(
-    detectionSpeed: DetectionSpeed.noDuplicates,
+    detectionSpeed: DetectionSpeed.normal,
     returnImage: false,
     formats: [BarcodeFormat.qrCode],
   );
@@ -31,12 +37,24 @@ class _StudentScannerScreenState extends State<StudentScannerScreen>
   @override
   void initState() {
     super.initState();
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+    ]);
+
     WidgetsBinding.instance.addObserver(this);
     _checkPermissions();
   }
 
   @override
   void dispose() {
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+      DeviceOrientation.landscapeLeft,
+      DeviceOrientation.landscapeRight,
+    ]);
+
     WidgetsBinding.instance.removeObserver(this);
     _controller.dispose();
     super.dispose();
@@ -131,10 +149,11 @@ class _StudentScannerScreenState extends State<StudentScannerScreen>
       final String sessionId = activeSessionQuery.docs.first.id;
 
       String? targetLabId;
-      if (qrData.startsWith('{')) {
+      try {
         final Map<String, dynamic> data = jsonDecode(qrData);
-        targetLabId = data['labId'];
-      } else {
+        if (data['a'] != "E") throw "Invalid QR";
+        targetLabId = data['l'];
+      } catch (e) {
         throw "Invalid QR Format! Please scan the official Lab QR.";
       }
 
@@ -231,6 +250,9 @@ class _StudentScannerScreenState extends State<StudentScannerScreen>
         uniqueKey!,
         studentPosition,
       );
+
+      ref.invalidate(attendanceProvider);
+      ref.read(dashboardControllerProvider.notifier).initData();
 
       _showSuccessScreen();
     } catch (e) {
@@ -398,6 +420,9 @@ class _StudentScannerScreenState extends State<StudentScannerScreen>
       return _buildSuccessView();
     }
 
+    final size = MediaQuery.of(context).size;
+    final scanSize = size.width * 0.7;
+
     return Scaffold(
       backgroundColor: Colors.black,
       body: Stack(
@@ -429,7 +454,6 @@ class _StudentScannerScreenState extends State<StudentScannerScreen>
               );
             },
           ),
-
           CustomPaint(
             painter: ScannerOverlayPainter(
               borderColor: _isProcessing
@@ -438,11 +462,10 @@ class _StudentScannerScreenState extends State<StudentScannerScreen>
               borderRadius: 24,
               borderLength: 30,
               borderWidth: 10,
-              cutOutSize: 280,
+              cutOutSize: scanSize,
             ),
             child: Container(),
           ),
-
           SafeArea(
             child: Column(
               children: [
@@ -485,9 +508,7 @@ class _StudentScannerScreenState extends State<StudentScannerScreen>
                     ],
                   ),
                 ),
-
                 const Spacer(),
-
                 Container(
                   margin: const EdgeInsets.only(bottom: 50),
                   padding: const EdgeInsets.symmetric(
@@ -513,12 +534,16 @@ class _StudentScannerScreenState extends State<StudentScannerScreen>
                             ),
                           ),
                         ),
-                      Text(
-                        _statusMessage,
-                        style: TextStyle(
-                          color: _statusColor,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
+                      Flexible(
+                        child: Text(
+                          _statusMessage,
+                          style: TextStyle(
+                            color: _statusColor,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                          textAlign: TextAlign.center,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ],
@@ -528,7 +553,6 @@ class _StudentScannerScreenState extends State<StudentScannerScreen>
               ],
             ),
           ),
-
           if (_isProcessing)
             Container(
               color: Colors.black.withOpacity(0.6),
@@ -566,6 +590,7 @@ class _StudentScannerScreenState extends State<StudentScannerScreen>
                         fontWeight: FontWeight.w600,
                         letterSpacing: 0.5,
                       ),
+                      textAlign: TextAlign.center,
                     ),
                   ],
                 ),

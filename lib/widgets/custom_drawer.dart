@@ -249,14 +249,6 @@ class CustomDrawer extends ConsumerWidget {
           theme: theme,
         ),
         _DrawerItem(
-          icon: Icons.history_rounded,
-          label: "Attendance History",
-          onTap: () {
-            Navigator.pop(context);
-          },
-          theme: theme,
-        ),
-        _DrawerItem(
           icon: Icons.notifications_outlined,
           label: "Notifications",
           onTap: () {

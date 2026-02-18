@@ -54,22 +54,19 @@ class AuthRepository {
     }
   }
 
-  Future<void> saveUserData({required String role}) async {
-    final user = auth.currentUser;
+  Future<void> saveUserData({required String role, required User user}) async {
     final deviceId = await getDeviceId();
+    final userDoc = await firestore.collection('users').doc(user.uid).get();
 
-    if (user != null) {
-      final userDoc = await firestore.collection('users').doc(user.uid).get();
-
-      if (!userDoc.exists) {
-        await firestore.collection('users').doc(user.uid).set({
-          'uid': user.uid,
-          'phone': user.phoneNumber,
-          'role': role,
-          'deviceId': deviceId,
-          'createdAt': FieldValue.serverTimestamp(),
-        });
-      }
+    if (!userDoc.exists) {
+      await firestore.collection('users').doc(user.uid).set({
+        'uid': user.uid,
+        'phoneNumber': user.phoneNumber,
+        'role': role,
+        'deviceId': deviceId,
+        'isSetupCompleted': false,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
     }
   }
 }

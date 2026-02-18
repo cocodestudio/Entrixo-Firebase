@@ -50,54 +50,66 @@ class AuthController extends StateNotifier<bool> {
   ) async {
     state = true;
     try {
-      await authRepository.verifyOTP(verId, otp);
+      final UserCredential credential = await authRepository.verifyOTP(
+        verId,
+        otp,
+      );
+      final User? user = credential.user;
 
-      final User? user = _auth.currentUser;
+      if (user == null) throw Exception("User not found after verification");
+
       bool isSetupDone = false;
 
-      if (user != null) {
-        final userDocRef = _firestore.collection('users').doc(user.uid);
-        final doc = await userDocRef.get();
+      final userDocRef = _firestore.collection('users').doc(user.uid);
+      final doc = await userDocRef.get();
 
-        if (doc.exists) {
-          isSetupDone = doc.data()?['isSetupCompleted'] ?? false;
+      if (doc.exists) {
+        isSetupDone = doc.data()?['isSetupCompleted'] ?? false;
+      } else {
+        final String loginPhone = user.phoneNumber ?? "";
+        final preApprovedQuery = await _firestore
+            .collection('users')
+            .where('phoneNumber', isEqualTo: loginPhone)
+            .get();
+
+        if (preApprovedQuery.docs.isNotEmpty) {
+          final manualDoc = preApprovedQuery.docs.first;
+          final data = manualDoc.data();
+
+          await userDocRef.set({
+            ...data,
+            'uid': user.uid,
+            'isManualEntry': false,
+            'isPreApproved': false,
+            'mergedAt': FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));
+
+          await manualDoc.reference.delete();
+          isSetupDone = data['isSetupCompleted'] ?? false;
         } else {
-          final String loginPhone = user.phoneNumber ?? "";
-
-          final preApprovedQuery = await _firestore
-              .collection('users')
-              .where('phoneNumber', isEqualTo: loginPhone)
-              .get();
-
-          if (preApprovedQuery.docs.isNotEmpty) {
-            final manualDoc = preApprovedQuery.docs.first;
-            final data = manualDoc.data() as Map<String, dynamic>;
-
-            data['uid'] = user.uid;
-
-            data['isManualEntry'] = false;
-            data['isPreApproved'] = false;
-            data['mergedAt'] = FieldValue.serverTimestamp();
-
-            await userDocRef.set(data);
-            await manualDoc.reference.delete();
-
-            isSetupDone = data['isSetupCompleted'] ?? false;
-          } else {
-            await authRepository.saveUserData(role: role);
-            isSetupDone = false;
-          }
+          await authRepository.saveUserData(role: role, user: user);
+          isSetupDone = false;
         }
       }
 
       state = false;
       onResult(isSetupDone);
     } catch (e) {
-      debugPrint("❌ Login Error: $e");
       state = false;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("Invalid OTP")));
+      debugPrint("❌ Login Error: $e");
+      String errorMessage = "Invalid OTP";
+      if (e is FirebaseAuthException) {
+        if (e.code == 'session-expired') {
+          errorMessage = "OTP Expired. Resend again.";
+        }
+        if (e.code == 'invalid-verification-code') {
+          errorMessage = "Wrong OTP. Check again.";
+        }
+      }
+
+      if (context.mounted) {
+        CustomToast.show(context, errorMessage, isError: true);
+      }
     }
   }
 
@@ -106,21 +118,43 @@ class AuthController extends StateNotifier<bool> {
     try {
       final prefs = await SharedPreferences.getInstance();
       await _auth.signOut();
-      await prefs.clear();
+      await prefs.remove('user_role');
+      await prefs.remove('setup_done');
+      await prefs.setBool('isFirstTime', false);
 
       state = false;
+
       if (context.mounted) {
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (context) => const LoginScreen()),
+        Navigator.of(context).pushAndRemoveUntil(
+          PageRouteBuilder(
+            transitionDuration: const Duration(milliseconds: 500),
+            pageBuilder: (context, animation, secondaryAnimation) =>
+                const LoginScreen(),
+            transitionsBuilder:
+                (context, animation, secondaryAnimation, child) {
+                  return FadeTransition(
+                    opacity: CurvedAnimation(
+                      parent: animation,
+                      curve: Curves.easeIn,
+                    ),
+                    child: child,
+                  );
+                },
+          ),
           (route) => false,
         );
+
         CustomToast.show(context, "Logged out successfully");
       }
     } catch (e) {
       state = false;
+      debugPrint("❌ Logout Error: $e");
       if (context.mounted) {
-        CustomToast.show(context, "Logout Failed: $e", isError: true);
+        CustomToast.show(
+          context,
+          "Logout Failed: Please try again",
+          isError: true,
+        );
       }
     }
   }

@@ -206,7 +206,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
           Text(
             'Welcome Back',
             style: theme.textTheme.displayLarge?.copyWith(
-              fontSize: 28,
+              fontSize: 18,
               fontWeight: FontWeight.w700,
               color: const Color(0xFF1A1A1A),
             ),
@@ -217,7 +217,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
             style: theme.textTheme.bodyMedium?.copyWith(
               color: const Color(0xFF666666),
               height: 1.5,
-              fontSize: 15,
+              fontSize: 13,
             ),
           ),
           const SizedBox(height: 40),
@@ -259,7 +259,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                   '+91',
                   style: theme.textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w700,
-                    fontSize: 18,
+                    fontSize: 14,
                     color: _phoneFocusNode.hasFocus
                         ? theme.primaryColor
                         : const Color(0xFF1A1A1A),
@@ -278,7 +278,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                     style: theme.textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w600,
                       letterSpacing: 1.5,
-                      fontSize: 18,
+                      fontSize: 14,
                       color: const Color(0xFF1A1A1A),
                     ),
                     decoration: InputDecoration(
@@ -291,7 +291,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                       hintStyle: theme.textTheme.bodyMedium?.copyWith(
                         color: const Color(0xFFAAAAAA),
                         letterSpacing: 0.5,
-                        fontSize: 16,
+                        fontSize: 14,
                         fontWeight: FontWeight.w400,
                       ),
                       filled: false,
@@ -324,7 +324,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                   : Text(
                       'Get OTP',
                       style: theme.textTheme.labelLarge?.copyWith(
-                        fontSize: 18,
+                        fontSize: 14,
                         fontWeight: FontWeight.w700,
                         letterSpacing: 1.2,
                       ),
@@ -361,7 +361,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                   ),
                   child: Icon(
                     Icons.arrow_back_ios_new_rounded,
-                    size: 20,
+                    size: 16,
                     color: theme.primaryColor,
                   ),
                 ),
@@ -370,7 +370,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
               Text(
                 'Verify OTP',
                 style: theme.textTheme.displayLarge?.copyWith(
-                  fontSize: 28,
+                  fontSize: 18,
                   color: const Color(0xFF1A1A1A),
                 ),
               ),
@@ -382,7 +382,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: const Color(0xFF666666),
                 height: 1.5,
-                fontSize: 15,
+                fontSize: 13,
               ),
               children: [
                 const TextSpan(text: 'Enter the 6-digit code sent to '),
@@ -436,7 +436,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                       return AnimatedContainer(
                         duration: const Duration(milliseconds: 200),
                         width: (size.width - 64 - 50) / 6,
-                        height: 64,
+                        height: 60,
                         alignment: Alignment.center,
                         decoration: BoxDecoration(
                           color: isCurrent || isFilled
@@ -464,7 +464,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                         child: Text(
                           char,
                           style: theme.textTheme.titleLarge?.copyWith(
-                            fontSize: 24,
+                            fontSize: 15,
                             fontWeight: FontWeight.w700,
                             color: theme.primaryColor,
                           ),
@@ -495,7 +495,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                   : Text(
                       'Verify & Proceed',
                       style: theme.textTheme.labelLarge?.copyWith(
-                        fontSize: 18,
+                        fontSize: 14,
                         fontWeight: FontWeight.w700,
                         letterSpacing: 1.2,
                       ),
@@ -511,7 +511,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                 text: TextSpan(
                   style: theme.textTheme.bodyMedium?.copyWith(
                     fontWeight: FontWeight.w600,
-                    fontSize: 15,
+                    fontSize: 13,
                   ),
                   children: [
                     const TextSpan(text: "Didn't receive code? "),

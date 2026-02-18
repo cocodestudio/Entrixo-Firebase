@@ -44,6 +44,8 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Entrixo',
       debugShowCheckedModeBanner: false,
+      themeMode: ThemeMode.light,
+
       theme: AppTheme.lightTheme.copyWith(
         pageTransitionsTheme: const PageTransitionsTheme(
           builders: {
@@ -51,6 +53,7 @@ class MyApp extends StatelessWidget {
           },
         ),
       ),
+      darkTheme: AppTheme.lightTheme,
       navigatorKey: navigatorKey,
       builder: (context, child) {
         return NetworkManager(

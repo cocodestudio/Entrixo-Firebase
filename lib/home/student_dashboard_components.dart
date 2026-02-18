@@ -1,5 +1,7 @@
 import 'dart:ui';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:entrixo/screens/student_assignment_screen.dart';
+import 'package:entrixo/screens/student_resources_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -13,38 +15,22 @@ import 'dart:async';
 class DashboardState {
   final bool isLoading;
   final String userName;
-  final double attendancePercentage;
-  final int totalLabs;
-  final int attendedLabs;
-  final int absentLabs;
   final List<Map<String, dynamic>> upcomingSessions;
 
   DashboardState({
     required this.isLoading,
     required this.userName,
-    required this.attendancePercentage,
-    required this.totalLabs,
-    required this.attendedLabs,
-    required this.absentLabs,
     this.upcomingSessions = const [],
   });
 
   DashboardState copyWith({
     bool? isLoading,
     String? userName,
-    double? attendancePercentage,
-    int? totalLabs,
-    int? attendedLabs,
-    int? absentLabs,
     List<Map<String, dynamic>>? upcomingSessions,
   }) {
     return DashboardState(
       isLoading: isLoading ?? this.isLoading,
       userName: userName ?? this.userName,
-      attendancePercentage: attendancePercentage ?? this.attendancePercentage,
-      totalLabs: totalLabs ?? this.totalLabs,
-      attendedLabs: attendedLabs ?? this.attendedLabs,
-      absentLabs: absentLabs ?? this.absentLabs,
       upcomingSessions: upcomingSessions ?? this.upcomingSessions,
     );
   }
@@ -58,24 +44,19 @@ final dashboardControllerProvider =
 class DashboardController extends StateNotifier<DashboardState> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  StreamSubscription? _attendanceSubscription;
 
   DashboardController()
     : super(
         DashboardState(
           isLoading: true,
           userName: 'Student',
-          attendancePercentage: 0.0,
-          totalLabs: 0,
-          attendedLabs: 0,
-          absentLabs: 0,
           upcomingSessions: [],
         ),
       ) {
-    _initData();
+    initData();
   }
 
-  Future<void> _initData() async {
+  Future<void> initData() async {
     try {
       final user = _auth.currentUser;
       if (user == null) return;
@@ -100,29 +81,17 @@ class DashboardController extends StateNotifier<DashboardState> {
       }
       final String sessionId = activeSessionQuery.docs.first.id;
 
-      _attendanceSubscription?.cancel();
-      _attendanceSubscription = _firestore
-          .collection('attendance')
-          .where('uid', isEqualTo: user.uid)
-          .snapshots()
-          .listen((snapshot) async {
-            await _updateDashboardStats(
-              snapshot,
-              name,
-              courseId,
-              semester,
-              sessionId,
-            );
-          });
+      await _fetchUpcomingSessions(courseId, semester, sessionId);
+
+      if (mounted) {
+        state = state.copyWith(isLoading: false, userName: name);
+      }
     } catch (e) {
-      debugPrint("Dashboard Error: $e");
       if (mounted) state = state.copyWith(isLoading: false);
     }
   }
 
-  Future<void> _updateDashboardStats(
-    QuerySnapshot attSnapshot,
-    String name,
+  Future<void> _fetchUpcomingSessions(
     String courseId,
     int semester,
     String sessionId,
@@ -134,29 +103,17 @@ class DashboardController extends StateNotifier<DashboardState> {
         .where('sessionId', isEqualTo: sessionId)
         .get();
 
-    int totalHappened = 0;
-    int totalPresent = 0;
     List<Map<String, dynamic>> allFutureSessions = [];
     DateTime now = DateTime.now();
 
-    final Set<String> presentKeys = {};
-    for (var doc in attSnapshot.docs) {
-      final data = doc.data() as Map<String, dynamic>;
-      if (data['status'] == 'Present' && data['dateKey'] != null) {
-        presentKeys.add("${data['subjectId']}_${data['dateKey']}");
-      }
-    }
-
     for (var subDoc in subjectsQuery.docs) {
       final subData = subDoc.data();
-      final String subjectId = subDoc.id;
       final List schedule = subData['schedule'] ?? [];
 
       for (var session in schedule) {
         if (session['date'] is! Timestamp) continue;
 
         final DateTime sessionDate = (session['date'] as Timestamp).toDate();
-        final String dateKey = DateFormat('yyyy-MM-dd').format(sessionDate);
         final String startTimeStr = session['startTime'];
         final String endTimeStr = session['endTime'];
 
@@ -184,26 +141,7 @@ class DashboardController extends StateNotifier<DashboardState> {
           fullEnd = sessionDate.add(const Duration(hours: 2));
         }
 
-        if (now.isAfter(fullEnd)) {
-          final sessionActiveCheck = await _firestore
-              .collection('attendance')
-              .where('subjectId', isEqualTo: subjectId)
-              .where('dateKey', isEqualTo: dateKey)
-              .limit(1)
-              .get();
-
-          if (sessionActiveCheck.docs.isNotEmpty) {
-            totalHappened++;
-            if (presentKeys.contains("${subjectId}_$dateKey")) {
-              totalPresent++;
-            }
-          }
-        } else if (now.isAfter(fullStart) && now.isBefore(fullEnd)) {
-          if (presentKeys.contains("${subjectId}_$dateKey")) {
-            totalHappened++;
-            totalPresent++;
-          }
-        } else {
+        if (now.isBefore(fullEnd)) {
           allFutureSessions.add({
             'subject': subData['name'],
             'code': subData['code'],
@@ -220,36 +158,15 @@ class DashboardController extends StateNotifier<DashboardState> {
     allFutureSessions.sort(
       (a, b) => a['rawDateTime'].compareTo(b['rawDateTime']),
     );
-    final List<Map<String, dynamic>> top3Sessions = allFutureSessions
-        .take(3)
-        .toList();
-
-    int absent = totalHappened - totalPresent;
-    double percentage = totalHappened == 0
-        ? 0.0
-        : (totalPresent / totalHappened);
 
     if (mounted) {
       state = state.copyWith(
-        isLoading: false,
-        userName: name,
-        totalLabs: totalHappened,
-        attendedLabs: totalPresent,
-        absentLabs: absent < 0 ? 0 : absent,
-        attendancePercentage: percentage,
-        upcomingSessions: top3Sessions,
+        upcomingSessions: allFutureSessions.take(3).toList(),
       );
     }
   }
-
-  @override
-  void dispose() {
-    _attendanceSubscription?.cancel();
-    super.dispose();
-  }
 }
 
-// --- 4. MAIN DASHBOARD UI ---
 class StudentDashboardContent extends ConsumerWidget {
   final ThemeData theme;
   final Size size;
@@ -276,24 +193,237 @@ class StudentDashboardContent extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const SizedBox(height: 24),
-            StatsGlassCard(
-              theme: theme,
-              percentage: state.attendancePercentage,
-              total: state.totalLabs,
-              present: state.attendedLabs,
-              absent: state.absentLabs,
-            ),
+            LiveAttendanceCard(theme: theme),
             const SizedBox(height: 32),
             PrimaryActionButton(theme: theme),
             const SizedBox(height: 32),
             QuickActionsSection(theme: theme),
             const SizedBox(height: 32),
-
             NextSessionSection(theme: theme, sessions: state.upcomingSessions),
             const SizedBox(height: 100),
           ],
         ),
       ),
+    );
+  }
+}
+
+class LiveAttendanceCard extends ConsumerWidget {
+  final ThemeData theme;
+  const LiveAttendanceCard({super.key, required this.theme});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final selectedId = ref.watch(selectedSessionProvider);
+    final attendanceAsync = ref.watch(attendanceProvider(selectedId));
+
+    return attendanceAsync.when(
+      data: (data) {
+        final int absent = data.totalClasses - data.totalPresent;
+        return StatsGlassCard(
+          theme: theme,
+          percentage: data.overallPercentage,
+          total: data.totalClasses,
+          present: data.totalPresent,
+          absent: absent < 0 ? 0 : absent,
+        );
+      },
+      loading: () => _buildLoadingState(theme),
+      error: (err, stack) => StatsGlassCard(
+        theme: theme,
+        percentage: 0.0,
+        total: 0,
+        present: 0,
+        absent: 0,
+      ),
+    );
+  }
+
+  Widget _buildLoadingState(ThemeData theme) {
+    return Container(
+      height: 220,
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: const Color(0xFF1A1A1A),
+        borderRadius: BorderRadius.circular(32),
+      ),
+      child: const Center(
+        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+      ),
+    );
+  }
+}
+
+class StatsGlassCard extends StatelessWidget {
+  final ThemeData theme;
+  final double percentage;
+  final int total;
+  final int present;
+  final int absent;
+
+  const StatsGlassCard({
+    super.key,
+    required this.theme,
+    required this.percentage,
+    required this.total,
+    required this.present,
+    required this.absent,
+  });
+
+  Color _getColor(double p) {
+    if (p >= 0.75) return const Color(0xFF10B981);
+    if (p >= 0.60) return const Color(0xFFF59E0B);
+    return const Color(0xFFEF4444);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF1A1A1A), Color(0xFF2C2C2C)],
+        ),
+        borderRadius: BorderRadius.circular(32),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.3),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              SizedBox(
+                width: 90,
+                height: 90,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    CircularProgressIndicator(
+                      value: percentage,
+                      strokeWidth: 9,
+                      backgroundColor: Colors.white.withOpacity(0.1),
+                      color: _getColor(percentage),
+                      strokeCap: StrokeCap.round,
+                    ),
+                    Center(
+                      child: Text(
+                        "${(percentage * 100).toInt()}%",
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 18,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 24),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      "Overall Attendance",
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      percentage >= 0.75
+                          ? "Excellent! Keep it up."
+                          : "Needs Improvement",
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.6),
+                        fontSize: 12,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        _smallPill("Total: $total", Colors.white24),
+                        const SizedBox(width: 8),
+                        _smallPill(
+                          "Present: $present",
+                          Colors.green.withOpacity(0.2),
+                          textColor: Colors.greenAccent,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          const Divider(color: Colors.white10, height: 1),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _bottomStat("Attended", "$present", Colors.greenAccent),
+              _bottomStat("Absent", "$absent", Colors.redAccent),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _smallPill(
+    String label,
+    Color bg, {
+    Color textColor = Colors.white70,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: textColor,
+          fontSize: 10,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
+  }
+
+  Widget _bottomStat(String label, String value, Color color) {
+    return Column(
+      children: [
+        Text(
+          value,
+          style: TextStyle(
+            color: color,
+            fontSize: 18,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          label,
+          style: const TextStyle(
+            color: Colors.white38,
+            fontSize: 10,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -353,7 +483,6 @@ class NextSessionSection extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 16),
-
         SizedBox(
           height: 155,
           child: ListView.separated(
@@ -412,7 +541,6 @@ class NextSessionSection extends StatelessWidget {
                         ),
                       ],
                     ),
-
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -437,7 +565,6 @@ class NextSessionSection extends StatelessWidget {
                         ),
                       ],
                     ),
-
                     Row(
                       children: [
                         _buildInfoChip(
@@ -513,316 +640,8 @@ class NextSessionSection extends StatelessWidget {
   }
 }
 
-class LiveAttendanceCard extends ConsumerWidget {
-  final ThemeData theme;
-
-  const LiveAttendanceCard({super.key, required this.theme});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final attendanceAsync = ref.watch(attendanceProvider);
-
-    return attendanceAsync.when(
-      data: (data) {
-        final int absent = data.totalClasses - data.totalPresent;
-        return StatsGlassCard(
-          theme: theme,
-          percentage: data.overallPercentage,
-          total: data.totalClasses,
-          present: data.totalPresent,
-          absent: absent < 0 ? 0 : absent,
-        );
-      },
-      loading: () => _buildLoadingState(theme),
-      error: (err, stack) => StatsGlassCard(
-        theme: theme,
-        percentage: 0.0,
-        total: 0,
-        present: 0,
-        absent: 0,
-      ),
-    );
-  }
-
-  Widget _buildLoadingState(ThemeData theme) {
-    return Container(
-      height: 220,
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(32),
-        border: Border.all(color: Colors.grey.withOpacity(0.1)),
-      ),
-      child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
-    );
-  }
-}
-
-class StatsGlassCard extends StatelessWidget {
-  final ThemeData theme;
-  final double percentage;
-  final int total;
-  final int present;
-  final int absent;
-
-  const StatsGlassCard({
-    super.key,
-    required this.theme,
-    required this.percentage,
-    required this.total,
-    required this.present,
-    required this.absent,
-  });
-
-  String _getMotivationalText(double p) {
-    if (p >= 0.75) return "Excellent! You are doing great.";
-    if (p >= 0.60) return "Good job! Keep maintaining it.";
-    if (p >= 0.40) return "Warning! You need to attend more labs.";
-    return "Critical! Your attendance is very low.";
-  }
-
-  Color _getColorForPercentage(double p) {
-    if (p >= 0.75) return const Color(0xFF10B981);
-    if (p >= 0.60) return const Color(0xFFF59E0B);
-    return const Color(0xFFEF4444);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final statusColor = _getColorForPercentage(percentage);
-
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(32),
-        boxShadow: [
-          BoxShadow(
-            color: theme.primaryColor.withOpacity(0.15),
-            blurRadius: 30,
-            offset: const Offset(0, 15),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(32),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-          child: Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.9),
-              borderRadius: BorderRadius.circular(32),
-              border: Border.all(
-                color: Colors.white.withOpacity(0.6),
-                width: 1.5,
-              ),
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Colors.white.withOpacity(0.95),
-                  Colors.white.withOpacity(0.6),
-                ],
-              ),
-            ),
-            child: Column(
-              children: [
-                Row(
-                  children: [
-                    SizedBox(
-                      width: 85,
-                      height: 85,
-                      child: Stack(
-                        fit: StackFit.expand,
-                        children: [
-                          CustomPaint(
-                            painter: _ProgressRingPainter(
-                              progress: percentage,
-                              activeColor: statusColor,
-                              backgroundColor: const Color(0xFFE5E7EB),
-                            ),
-                          ),
-                          Center(
-                            child: Text(
-                              '${(percentage * 100).toInt()}%',
-                              style: const TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.w900,
-                                color: Color(0xFF1A1A1A),
-                                letterSpacing: -0.5,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 20),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Overall Attendance',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFF1A1A1A),
-                              letterSpacing: -0.3,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            _getMotivationalText(percentage),
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
-                              color: statusColor.withOpacity(0.8),
-                              height: 1.4,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    vertical: 16,
-                    horizontal: 12,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF9FAFB),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: const Color(0xFFF3F4F6)),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
-                    children: [
-                      _StatColumn(
-                        label: 'Total',
-                        value: total.toString(),
-                        color: const Color(0xFF6366F1),
-                      ),
-                      Container(
-                        width: 1,
-                        height: 30,
-                        color: const Color(0xFFE5E7EB),
-                      ),
-                      _StatColumn(
-                        label: 'Present',
-                        value: present.toString(),
-                        color: const Color(0xFF10B981),
-                      ),
-                      Container(
-                        width: 1,
-                        height: 30,
-                        color: const Color(0xFFE5E7EB),
-                      ),
-                      _StatColumn(
-                        label: 'Absent',
-                        value: absent.toString(),
-                        color: const Color(0xFFEF4444),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _StatColumn extends StatelessWidget {
-  final String label;
-  final String value;
-  final Color color;
-
-  const _StatColumn({
-    required this.label,
-    required this.value,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.w900,
-            color: color,
-            height: 1,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w600,
-            color: const Color(0xFF9CA3AF),
-            letterSpacing: 0.3,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _ProgressRingPainter extends CustomPainter {
-  final double progress;
-  final Color activeColor;
-  final Color backgroundColor;
-
-  _ProgressRingPainter({
-    required this.progress,
-    required this.activeColor,
-    required this.backgroundColor,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final radius = size.width / 2;
-    final strokeWidth = 8.0;
-
-    final backgroundPaint = Paint()
-      ..color = backgroundColor
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = strokeWidth
-      ..strokeCap = StrokeCap.round;
-
-    canvas.drawCircle(center, radius - strokeWidth / 2, backgroundPaint);
-
-    final activePaint = Paint()
-      ..color = activeColor
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = strokeWidth
-      ..strokeCap = StrokeCap.round;
-
-    final sweepAngle = 2 * 3.14159 * progress;
-    canvas.drawArc(
-      Rect.fromCircle(center: center, radius: radius - strokeWidth / 2),
-      -3.14159 / 2,
-      sweepAngle,
-      false,
-      activePaint,
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
-}
-
 class PrimaryActionButton extends StatelessWidget {
   final ThemeData theme;
-
   const PrimaryActionButton({super.key, required this.theme});
 
   @override
@@ -902,7 +721,6 @@ class PrimaryActionButton extends StatelessWidget {
 
 class QuickActionsSection extends StatelessWidget {
   final ThemeData theme;
-
   const QuickActionsSection({super.key, required this.theme});
 
   @override
@@ -940,13 +758,27 @@ class QuickActionsSection extends StatelessWidget {
               icon: Icons.assignment_rounded,
               label: 'Assignments',
               color: const Color(0xFFF59E0B),
-              onTap: () {},
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const StudentAssignmentScreen(),
+                  ),
+                );
+              },
             ),
             _QuickActionItem(
               icon: Icons.menu_book_rounded,
               label: 'Resources',
               color: const Color(0xFF10B981),
-              onTap: () {},
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const StudentResourcesScreen(),
+                  ),
+                );
+              },
             ),
           ],
         ),

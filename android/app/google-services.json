@@ -12,7 +12,28 @@
           "package_name": "com.cocode.entrixo"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "227829765725-fp895d71k3fi9evrbpijlqndjgavaaob.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.cocode.entrixo",
+            "certificate_hash": "fa37fa3dde596bee0331a823098dc98e379d691e"
+          }
+        },
+        {
+          "client_id": "227829765725-g1dtvbsloscb9s1hetsssaa2rdbnjen2.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.cocode.entrixo",
+            "certificate_hash": "b200aeb5adf5e4a586467727882f82d9bfeabc4a"
+          }
+        },
+        {
+          "client_id": "227829765725-r0n2tcok9b9kmgj08ouj4s83k14a1t7h.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyC6HO8tSdfnG6UzBVNI33WSGfn_lYidb2E"
@@ -20,7 +41,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "227829765725-r0n2tcok9b9kmgj08ouj4s83k14a1t7h.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

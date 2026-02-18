@@ -117,14 +117,14 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   }
 
   Widget _buildDashboardContent(
-      ThemeData theme,
-      Size size,
-      double topPadding,
-      String userName,
-      String? profileUrl,
-      String userRole,
-      WidgetRef ref,
-      ) {
+    ThemeData theme,
+    Size size,
+    double topPadding,
+    String userName,
+    String? profileUrl,
+    String userRole,
+    WidgetRef ref,
+  ) {
     if (userRole == "admin") {
       return CustomScrollView(
         physics: const ClampingScrollPhysics(),
@@ -183,13 +183,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   padding: const EdgeInsets.fromLTRB(24, 24, 24, 140),
                   child: Column(
                     children: [
-                      StatsGlassCard(
-                        theme: theme,
-                        percentage: state.attendancePercentage,
-                        total: state.totalLabs,
-                        present: state.attendedLabs,
-                        absent: state.absentLabs,
-                      ),
+                      LiveAttendanceCard(theme: theme),
                       const SizedBox(height: 32),
                       PrimaryActionButton(theme: theme),
                       const SizedBox(height: 32),

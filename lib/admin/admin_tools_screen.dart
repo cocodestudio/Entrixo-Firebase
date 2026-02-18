@@ -1,8 +1,10 @@
 import 'package:entrixo/admin/add_student_screen.dart';
 import 'package:entrixo/admin/admin_manual_attendance.dart';
+import 'package:entrixo/admin/daily_headcount_screen.dart';
 import 'package:entrixo/admin/lab_management_screen.dart';
 import 'package:entrixo/admin/manage_faculty_screen.dart';
 import 'package:entrixo/admin/qr_generator_screen.dart';
+import 'package:entrixo/admin/resource_upload_screen.dart';
 import 'package:entrixo/admin/session_management_screen.dart';
 import 'package:entrixo/admin/student_list_screen.dart';
 import 'package:flutter/material.dart';
@@ -126,7 +128,14 @@ class AdminToolsScreen extends StatelessWidget {
                 subtitle: "Download CSV & Analytics",
                 icon: Icons.bar_chart_rounded,
                 gradientColors: const [Color(0xFFFF9F43), Color(0xFFFFB74D)],
-                onTap: () {},
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const DailyHeadcountScreen(),
+                    ),
+                  );
+                },
               ),
             ),
           ),
@@ -227,12 +236,19 @@ class AdminToolsScreen extends StatelessWidget {
 
                 // 6. Timetable (New)
                 _GridActionCard(
-                  title: "Class\nTimetable",
-                  subtitle: "Schedule",
-                  icon: Icons.calendar_month_rounded,
+                  title: "Resources\nManage",
+                  subtitle: "Manage Res. & Assign.",
+                  icon: Icons.assignment_ind_rounded,
                   gradientColors: const [Color(0xFF6c5ce7), Color(0xFFa29bfe)],
                   isSmall: true,
-                  onTap: () {},
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const ResourceUploadScreen(),
+                      ),
+                    );
+                  },
                 ),
 
                 // 7. Exams (New)

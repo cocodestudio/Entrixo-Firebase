@@ -7,7 +7,6 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../auth/login_screen.dart';
 import '../home/dashboard_screen.dart';
-import '../widgets/predictive_transition.dart';
 import 'onboarding_screen.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -47,43 +46,38 @@ class _SplashScreenState extends State<SplashScreen>
 
   Future<void> _initAppFlow() async {
     final startTime = DateTime.now();
-    Widget nextScreen = const OnboardingScreen();
+    Widget nextScreen = const LoginScreen();
 
     try {
       final prefs = await SharedPreferences.getInstance();
       final bool isFirstTime = prefs.getBool('isFirstTime') ?? true;
-      final auth = FirebaseAuth.instance;
-      User? user = auth.currentUser;
 
       if (isFirstTime) {
         nextScreen = const OnboardingScreen();
-      } else if (user != null) {
-        nextScreen = await _determineUserDestination(user.uid);
       } else {
-        nextScreen = const LoginScreen();
+        final user = FirebaseAuth.instance.currentUser;
+        if (user != null) {
+          nextScreen = await _determineUserDestination(user);
+        } else {
+          nextScreen = const LoginScreen();
+        }
       }
     } catch (e) {
-      nextScreen = const OnboardingScreen();
+      nextScreen = const LoginScreen();
     } finally {
       _navigate(nextScreen, startTime);
     }
   }
 
-  Future<Widget> _determineUserDestination(String uid) async {
+  Future<Widget> _determineUserDestination(User user) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final bool? localSetupDone = prefs.getBool('setup_done');
-      final String? localRole = prefs.getString('user_role');
-
-      if (localSetupDone == true) {
-        return const DashboardScreen();
-      }
 
       final doc = await FirebaseFirestore.instance
           .collection('users')
-          .doc(uid)
+          .doc(user.uid)
           .get(const GetOptions(source: Source.serverAndCache))
-          .timeout(const Duration(seconds: 3));
+          .timeout(const Duration(seconds: 5));
 
       if (doc.exists && doc.data() != null) {
         final data = doc.data()!;
@@ -93,15 +87,26 @@ class _SplashScreenState extends State<SplashScreen>
         await prefs.setString('user_role', role);
         await prefs.setBool('setup_done', isSetupCompleted);
 
-        if (role == 'admin') return const DashboardScreen();
+        if (role == 'admin') {
+          return const DashboardScreen();
+        }
+
         return isSetupCompleted
             ? const DashboardScreen()
             : const StudentSetupScreen();
-      } else {
-        return const StudentSetupScreen();
       }
+
+      return const LoginScreen();
     } catch (e) {
-      return const StudentSetupScreen();
+      final prefs = await SharedPreferences.getInstance();
+      final bool? localSetupDone = prefs.getBool('setup_done');
+      final String? localRole = prefs.getString('user_role');
+
+      if (localSetupDone == true || localRole == 'admin') {
+        return const DashboardScreen();
+      }
+
+      return const LoginScreen();
     }
   }
 
@@ -112,32 +117,31 @@ class _SplashScreenState extends State<SplashScreen>
     Timer(remaining.isNegative ? Duration.zero : remaining, () {
       if (!mounted) return;
 
-      Navigator.pushReplacement(
-        context,
-        PageRouteBuilder(
-          transitionDuration: const Duration(milliseconds: 400),
-          reverseTransitionDuration: const Duration(milliseconds: 400),
-          pageBuilder: (context, animation, secondaryAnimation) => nextScreen,
-          transitionsBuilder: (context, animation, secondaryAnimation, child) {
-            final curveAnimation = CurvedAnimation(
-              parent: animation,
-              curve: Curves.easeOutCubic,
-              reverseCurve: Curves.easeInCubic,
-            );
+      final route = PageRouteBuilder(
+        transitionDuration: const Duration(milliseconds: 500),
+        reverseTransitionDuration: const Duration(milliseconds: 500),
+        pageBuilder: (context, animation, secondaryAnimation) => nextScreen,
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          final curveAnimation = CurvedAnimation(
+            parent: animation,
+            curve: Curves.fastOutSlowIn,
+            reverseCurve: Curves.fastOutSlowIn,
+          );
 
-            return FadeTransition(
-              opacity: curveAnimation,
-              child: SlideTransition(
-                position: Tween<Offset>(
-                  begin: const Offset(0.05, 0),
-                  end: Offset.zero,
-                ).animate(curveAnimation),
-                child: child,
-              ),
-            );
-          },
-        ),
+          return FadeTransition(
+            opacity: curveAnimation,
+            child: SlideTransition(
+              position: Tween<Offset>(
+                begin: const Offset(0.02, 0),
+                end: Offset.zero,
+              ).animate(curveAnimation),
+              child: child,
+            ),
+          );
+        },
       );
+
+      Navigator.of(context).pushAndRemoveUntil(route, (route) => false);
     });
   }
 

@@ -20,11 +20,10 @@ class _SessionManagementScreenState extends State<SessionManagementScreen> {
   DateTime? _startDate;
   DateTime? _endDate;
 
-  // Selection State
   String _selectedCourseId = 'ALL';
   String _selectedCourseName = 'All Courses (Global)';
   String _selectedSemester = 'ALL';
-  int _currentCourseDuration = 0; // 0 means not applicable (Global)
+  int _currentCourseDuration = 0;
 
   Future<void> _selectDate(BuildContext context, bool isStart) async {
     final DateTime? picked = await showDatePicker(
@@ -55,9 +54,9 @@ class _SessionManagementScreenState extends State<SessionManagementScreen> {
   }
 
   Future<void> _createSession() async {
-    if (_nameController.text.trim().isEmpty ||
-        _startDate == null ||
-        _endDate == null) {
+    final String sessionName = _nameController.text.trim();
+
+    if (sessionName.isEmpty || _startDate == null || _endDate == null) {
       CustomToast.show(
         context,
         "Please fill all required fields",
@@ -78,7 +77,23 @@ class _SessionManagementScreenState extends State<SessionManagementScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // Deactivate old active sessions
+      final duplicateCheck = await _firestore
+          .collection('academic_sessions')
+          .where('sessionName', isEqualTo: sessionName)
+          .limit(1)
+          .get();
+
+      if (duplicateCheck.docs.isNotEmpty) {
+        if (mounted) {
+          CustomToast.show(
+            context,
+            "Session '$sessionName' already exists!",
+            isError: true,
+          );
+        }
+        return;
+      }
+
       final activeSessions = await _firestore
           .collection('academic_sessions')
           .where('status', isEqualTo: 'Active')
@@ -102,8 +117,16 @@ class _SessionManagementScreenState extends State<SessionManagementScreen> {
             : "$_selectedCourseName • Semester $_selectedSemester";
       }
 
+      String academicYear = "";
+      if (_startDate != null) {
+        int startYear = _startDate!.year;
+        int nextYearShort = (startYear + 1) % 100;
+        academicYear = "$startYear-$nextYearShort";
+      }
+
       batch.set(newSession, {
-        'sessionName': _nameController.text.trim(),
+        'sessionName': sessionName,
+        'academicYear': academicYear,
         'startDate': Timestamp.fromDate(_startDate!),
         'endDate': Timestamp.fromDate(_endDate!),
         'courseId': _selectedCourseId,
@@ -134,7 +157,44 @@ class _SessionManagementScreenState extends State<SessionManagementScreen> {
     }
   }
 
-  // --- SELECTION SHEETS (Replaces Dropdowns) ---
+  Future<void> _deleteSession(String sessionId) async {
+    bool? confirm = await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Delete Session"),
+        content: const Text(
+          "Are you sure you want to delete this session? This action cannot be undone.",
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text("Cancel"),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text("Delete"),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      try {
+        await _firestore
+            .collection('academic_sessions')
+            .doc(sessionId)
+            .delete();
+        if (mounted) {
+          CustomToast.show(context, "Session Deleted Successfully");
+        }
+      } catch (e) {
+        if (mounted) {
+          CustomToast.show(context, "Error: $e", isError: true);
+        }
+      }
+    }
+  }
 
   void _showCourseSelector(StateSetter setSheetState) {
     showModalBottomSheet(
@@ -181,7 +241,6 @@ class _SessionManagementScreenState extends State<SessionManagementScreen> {
                   child: ListView(
                     shrinkWrap: true,
                     children: [
-                      // Global Option
                       _buildSelectionItem(
                         title: "All Courses (Global)",
                         isSelected: _selectedCourseId == 'ALL',
@@ -190,13 +249,12 @@ class _SessionManagementScreenState extends State<SessionManagementScreen> {
                             _selectedCourseId = 'ALL';
                             _selectedCourseName = 'All Courses (Global)';
                             _currentCourseDuration = 0;
-                            _selectedSemester = 'ALL'; // Reset sem
+                            _selectedSemester = 'ALL';
                           });
                           Navigator.pop(context);
                         },
                       ),
                       const Divider(height: 1),
-                      // Dynamic Courses
                       ...courses.map((doc) {
                         final data = doc.data() as Map<String, dynamic>;
                         return _buildSelectionItem(
@@ -208,7 +266,7 @@ class _SessionManagementScreenState extends State<SessionManagementScreen> {
                               _selectedCourseId = doc.id;
                               _selectedCourseName = data['name'];
                               _currentCourseDuration = data['durationYears'];
-                              _selectedSemester = 'ALL'; // Reset sem
+                              _selectedSemester = 'ALL';
                             });
                             Navigator.pop(context);
                           },
@@ -392,7 +450,6 @@ class _SessionManagementScreenState extends State<SessionManagementScreen> {
               ),
               const SizedBox(height: 32),
 
-              // Name Input
               TextField(
                 controller: _nameController,
                 style: const TextStyle(fontWeight: FontWeight.w600),
@@ -409,7 +466,6 @@ class _SessionManagementScreenState extends State<SessionManagementScreen> {
               ),
               const SizedBox(height: 16),
 
-              // Date Pickers
               Row(
                 children: [
                   Expanded(
@@ -441,7 +497,9 @@ class _SessionManagementScreenState extends State<SessionManagementScreen> {
                             Text(
                               _startDate == null
                                   ? "Start Date"
-                                  : DateFormat('dd MMM').format(_startDate!),
+                                  : DateFormat(
+                                      'dd MMM yyyy',
+                                    ).format(_startDate!),
                               style: TextStyle(
                                 fontWeight: FontWeight.w600,
                                 color: _startDate == null
@@ -484,7 +542,7 @@ class _SessionManagementScreenState extends State<SessionManagementScreen> {
                             Text(
                               _endDate == null
                                   ? "End Date"
-                                  : DateFormat('dd MMM').format(_endDate!),
+                                  : DateFormat('dd MMM yyyy').format(_endDate!),
                               style: TextStyle(
                                 fontWeight: FontWeight.w600,
                                 color: _endDate == null
@@ -511,7 +569,6 @@ class _SessionManagementScreenState extends State<SessionManagementScreen> {
               ),
               const SizedBox(height: 8),
 
-              // Custom Course Selector
               GestureDetector(
                 onTap: () => _showCourseSelector(setSheetState),
                 child: Container(
@@ -554,7 +611,6 @@ class _SessionManagementScreenState extends State<SessionManagementScreen> {
 
               const SizedBox(height: 12),
 
-              // Custom Semester Selector
               Opacity(
                 opacity: _selectedCourseId == 'ALL' ? 0.5 : 1.0,
                 child: GestureDetector(
@@ -666,7 +722,7 @@ class _SessionManagementScreenState extends State<SessionManagementScreen> {
           "Academic Sessions",
           style: theme.textTheme.titleLarge?.copyWith(
             fontWeight: FontWeight.w800,
-            fontSize: 16
+            fontSize: 16,
           ),
         ),
       ),
@@ -679,7 +735,11 @@ class _SessionManagementScreenState extends State<SessionManagementScreen> {
           icon: const Icon(Icons.add_rounded, color: Colors.white),
           label: const Text(
             "New Session",
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 14),
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
+              fontSize: 14,
+            ),
           ),
         ),
       ),
@@ -770,7 +830,7 @@ class _SessionManagementScreenState extends State<SessionManagementScreen> {
                                   ),
                                   const SizedBox(width: 4),
                                   Text(
-                                    "${DateFormat('MMM yy').format(data['startDate'].toDate())} - ${DateFormat('MMM yy').format(data['endDate'].toDate())}",
+                                    "${DateFormat('dd MMM yyyy').format(data['startDate'].toDate())} - ${DateFormat('dd MMM yyyy').format(data['endDate'].toDate())}",
                                     style: TextStyle(
                                       color: Colors.grey[600],
                                       fontSize: 12,
@@ -782,25 +842,49 @@ class _SessionManagementScreenState extends State<SessionManagementScreen> {
                             ],
                           ),
                         ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: isActive
-                                ? Colors.green.withOpacity(0.1)
-                                : Colors.grey[100],
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            isActive ? "ACTIVE" : "ENDED",
-                            style: TextStyle(
-                              color: isActive ? Colors.green : Colors.grey[500],
-                              fontWeight: FontWeight.w800,
-                              fontSize: 10,
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                color: isActive
+                                    ? Colors.green.withOpacity(0.1)
+                                    : Colors.grey[100],
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                isActive ? "ACTIVE" : "ENDED",
+                                style: TextStyle(
+                                  color: isActive
+                                      ? Colors.green
+                                      : Colors.grey[500],
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 10,
+                                ),
+                              ),
                             ),
-                          ),
+                            const SizedBox(height: 8),
+                            InkWell(
+                              onTap: () => _deleteSession(data.id),
+                              borderRadius: BorderRadius.circular(8),
+                              child: Container(
+                                padding: const EdgeInsets.all(6),
+                                decoration: BoxDecoration(
+                                  color: Colors.red.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Icon(
+                                  Icons.delete_outline_rounded,
+                                  size: 18,
+                                  color: Colors.red,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),

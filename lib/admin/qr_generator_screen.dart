@@ -366,10 +366,15 @@ class _QRGeneratorScreenState extends State<QRGeneratorScreen> {
                       final pcNumber =
                           "PC-${(index + 1).toString().padLeft(2, '0')}";
 
-                      final String uniqueKey =
-                          "KEY_${_selectedLabId}_${pcNumber}_${DateTime.now().day}";
-                      final String qrData =
-                          "ENTRIXO_SECURE|SESSION_ID_HERE|SUBJECT_ID_HERE|$uniqueKey|${DateTime.now().millisecondsSinceEpoch}";
+                      final Map<String, dynamic> qrMap = {
+                        "a": "E",
+                        "l": _selectedLabId,
+                        "p": pcNumber,
+                        "k": "KEY_${_selectedLabId}_${pcNumber}",
+                        "t": DateTime.now().millisecondsSinceEpoch,
+                      };
+
+                      final String qrData = jsonEncode(qrMap);
 
                       return Container(
                         decoration: BoxDecoration(
@@ -386,28 +391,28 @@ class _QRGeneratorScreenState extends State<QRGeneratorScreen> {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            // Header PC Number
                             Container(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 12,
                                 vertical: 4,
                               ),
                               decoration: BoxDecoration(
-                                color: theme.primaryColor.withOpacity(0.08),
+                                color: Theme.of(
+                                  context,
+                                ).primaryColor.withOpacity(0.08),
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Text(
                                 pcNumber,
                                 style: TextStyle(
                                   fontWeight: FontWeight.w900,
-                                  color: theme.primaryColor,
+                                  color: Theme.of(context).primaryColor,
                                   fontSize: 12,
                                 ),
                               ),
                             ),
                             const SizedBox(height: 12),
 
-                            // QR Image
                             QrImageView(
                               data: qrData,
                               version: QrVersions.auto,
@@ -418,7 +423,6 @@ class _QRGeneratorScreenState extends State<QRGeneratorScreen> {
 
                             const SizedBox(height: 12),
 
-                            // Download Button (Premium Look)
                             Material(
                               color: Colors.transparent,
                               child: InkWell(

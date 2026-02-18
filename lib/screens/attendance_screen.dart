@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/legacy.dart';
 import 'package:intl/intl.dart';
 import '../widgets/geometric_loader.dart';
 
@@ -12,164 +13,231 @@ class AttendanceData {
   final double overallPercentage;
   final int totalClasses;
   final int totalPresent;
+  final String activeSessionId;
+  final String activeSessionName;
 
   AttendanceData({
     required this.subjects,
     required this.overallPercentage,
     required this.totalClasses,
     required this.totalPresent,
+    required this.activeSessionId,
+    required this.activeSessionName,
   });
 }
 
-final attendanceProvider = FutureProvider.autoDispose<AttendanceData>((
-  ref,
-) async {
+final sessionListProvider =
+    FutureProvider.autoDispose<List<Map<String, String>>>((ref) async {
+      final firestore = FirebaseFirestore.instance;
+      final snapshot = await firestore
+          .collection('academic_sessions')
+          .orderBy('startDate', descending: true)
+          .get();
+
+      return snapshot.docs.map((doc) {
+        final data = doc.data();
+        final String name = data['sessionName'] as String;
+        final String year = data['academicYear'] ?? '';
+        final String displayName = year.isNotEmpty ? "$name ($year)" : name;
+
+        return {'id': doc.id, 'name': displayName};
+      }).toList();
+    });
+
+final selectedSessionProvider = StateProvider.autoDispose<String?>(
+  (ref) => null,
+);
+
+final _attendanceTriggerProvider = StreamProvider.autoDispose((ref) {
   final user = FirebaseAuth.instance.currentUser;
-  if (user == null) throw Exception("User not logged in");
+  if (user == null) return const Stream.empty();
+  return FirebaseFirestore.instance
+      .collection('attendance')
+      .where('uid', isEqualTo: user.uid)
+      .snapshots();
+});
 
-  final firestore = FirebaseFirestore.instance;
-  final userDoc = await firestore.collection('users').doc(user.uid).get();
-  final userData = userDoc.data();
-  if (userData == null) throw Exception("User data not found");
+final attendanceProvider = FutureProvider.autoDispose
+    .family<AttendanceData, String?>((ref, sessionId) async {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) throw Exception("User not logged in");
 
-  final String? courseId = userData['courseId'];
-  final int? currentSemester = userData['currentSemester'];
+      ref.watch(_attendanceTriggerProvider);
 
-  final activeSessionQuery = await firestore
-      .collection('academic_sessions')
-      .where('status', isEqualTo: 'Active')
-      .limit(1)
-      .get();
+      final firestore = FirebaseFirestore.instance;
+      final userDoc = await firestore.collection('users').doc(user.uid).get();
+      final userData = userDoc.data();
+      if (userData == null) throw Exception("User data not found");
 
-  if (activeSessionQuery.docs.isEmpty) {
-    return AttendanceData(
-      subjects: [],
-      overallPercentage: 0,
-      totalClasses: 0,
-      totalPresent: 0,
-    );
-  }
+      final String? courseId = userData['courseId'];
 
-  final String activeSessionId = activeSessionQuery.docs.first.id;
+      String targetSessionId = sessionId ?? '';
+      String targetSessionName = '';
 
-  final subjectsQuery = await firestore
-      .collection('subjects')
-      .where('courseId', isEqualTo: courseId)
-      .where('semester', isEqualTo: currentSemester)
-      .where('sessionId', isEqualTo: activeSessionId)
-      .orderBy('code')
-      .get();
-
-  List<Map<String, dynamic>> finalSubjects = [];
-  int globalTotal = 0;
-  int globalPresent = 0;
-
-  for (var doc in subjectsQuery.docs) {
-    final data = doc.data();
-    final subjectId = doc.id;
-
-    String facultyName = "Faculty";
-    if (data['createdBy'] != null && data['createdBy'].toString().isNotEmpty) {
-      try {
-        final facultyDoc = await firestore
-            .collection('users')
-            .doc(data['createdBy'])
-            .get();
-        facultyName = facultyDoc.data()?['name'] ?? "Admin";
-      } catch (e) {
-        facultyName = "Admin";
-      }
-    }
-
-    // Student's own attendance for this subject
-    final attendanceQuery = await firestore
-        .collection('attendance')
-        .where('uid', isEqualTo: user.uid)
-        .where('subjectId', isEqualTo: subjectId)
-        .get();
-
-    Map<String, String> attendanceMap = {};
-    for (var att in attendanceQuery.docs) {
-      final date = (att['timestamp'] as Timestamp).toDate();
-      final dateKey = DateFormat('yyyy-MM-dd').format(date);
-      attendanceMap[dateKey] = att['status'] ?? 'Present';
-    }
-
-    final List rawSchedule = data['schedule'] ?? [];
-    List<Map<String, dynamic>> fullSessionHistory = [];
-    int subjectTotal = 0;
-    int subjectPresent = 0;
-
-    for (var session in rawSchedule) {
-      if (session['date'] is! Timestamp) continue;
-      DateTime sessionDate = (session['date'] as Timestamp).toDate();
-      final dateKey = DateFormat('yyyy-MM-dd').format(sessionDate);
-      final endParts = session['endTime'].split(':');
-      final DateTime sessionEndFull = DateTime(
-        sessionDate.year,
-        sessionDate.month,
-        sessionDate.day,
-        int.parse(endParts[0]),
-        int.parse(endParts[1]),
-      );
-
-      String status = "Upcoming";
-
-      if (attendanceMap.containsKey(dateKey)) {
-        status = attendanceMap[dateKey]!;
-      } else if (DateTime.now().isAfter(sessionEndFull)) {
-        // --- OPTION 3: PEER CHECK LOGIC ---
-        // Check if ANYONE in the class marked attendance for this session
-        final globalCheck = await firestore
-            .collection('attendance')
-            .where('subjectId', isEqualTo: subjectId)
-            .where('dateKey', isEqualTo: dateKey)
+      if (targetSessionId.isEmpty) {
+        final activeSessionQuery = await firestore
+            .collection('academic_sessions')
+            .where('status', isEqualTo: 'Active')
             .limit(1)
             .get();
 
-        if (globalCheck.docs.isNotEmpty) {
-          status = "Absent"; // Lab hui thi, par tumne mark nahi ki
-        } else {
-          status = "Not Marked"; // Lab hi nahi hui (Teacher absent)
+        if (activeSessionQuery.docs.isNotEmpty) {
+          final doc = activeSessionQuery.docs.first;
+          final data = doc.data();
+          targetSessionId = doc.id;
+          final String sName = data['sessionName'] ?? '';
+          final String aYear = data['academicYear'] ?? '';
+          targetSessionName = aYear.isNotEmpty ? "$sName ($aYear)" : sName;
+        }
+      } else {
+        final sessionDoc = await firestore
+            .collection('academic_sessions')
+            .doc(targetSessionId)
+            .get();
+        if (sessionDoc.exists) {
+          final data = sessionDoc.data();
+          if (data != null) {
+            final String sName = data['sessionName'] ?? '';
+            final String aYear = data['academicYear'] ?? '';
+            targetSessionName = aYear.isNotEmpty ? "$sName ($aYear)" : sName;
+          }
         }
       }
 
-      if (status == 'Present') subjectPresent++;
-      // Stats mein sirf tabhi gino jab session actually Conduct hua ho (Present or Absent)
-      if (status == 'Present' || status == 'Absent') subjectTotal++;
+      if (targetSessionId.isEmpty) {
+        return AttendanceData(
+          subjects: [],
+          overallPercentage: 0,
+          totalClasses: 0,
+          totalPresent: 0,
+          activeSessionId: '',
+          activeSessionName: 'No Active Session',
+        );
+      }
 
-      fullSessionHistory.add({
-        'date': sessionDate,
-        'startTime': session['startTime'],
-        'endTime': session['endTime'],
-        'status': status,
-        'topic': "Lab Session",
-      });
-    }
+      if (sessionId == null) {
+        Future.microtask(() {
+          ref.read(selectedSessionProvider.notifier).state = targetSessionId;
+        });
+      }
 
-    fullSessionHistory.sort((a, b) => a['date'].compareTo(b['date']));
-    globalTotal += subjectTotal;
-    globalPresent += subjectPresent;
+      final subjectsQuery = await firestore
+          .collection('subjects')
+          .where('courseId', isEqualTo: courseId)
+          .where('sessionId', isEqualTo: targetSessionId)
+          .get();
 
-    finalSubjects.add({
-      'id': subjectId,
-      'name': data['name'] ?? 'Unknown Subject',
-      'code': data['code'] ?? '---',
-      'faculty': facultyName,
-      'total': subjectTotal,
-      'attended': subjectPresent,
-      'sessions': fullSessionHistory,
+      List<Map<String, dynamic>> finalSubjects = [];
+      int globalTotal = 0;
+      int globalPresent = 0;
+
+      for (var doc in subjectsQuery.docs) {
+        final data = doc.data();
+        final subjectId = doc.id;
+
+        String facultyName = "Faculty";
+        if (data['createdBy'] != null &&
+            data['createdBy'].toString().isNotEmpty) {
+          try {
+            final facultyDoc = await firestore
+                .collection('users')
+                .doc(data['createdBy'])
+                .get();
+            facultyName = facultyDoc.data()?['name'] ?? "Admin";
+          } catch (e) {
+            facultyName = "Admin";
+          }
+        }
+
+        final attendanceQuery = await firestore
+            .collection('attendance')
+            .where('uid', isEqualTo: user.uid)
+            .where('subjectId', isEqualTo: subjectId)
+            .get();
+
+        Map<String, String> attendanceMap = {};
+        for (var att in attendanceQuery.docs) {
+          final date = (att['timestamp'] as Timestamp).toDate();
+          final dateKey = DateFormat('yyyy-MM-dd').format(date);
+          attendanceMap[dateKey] = att['status'] ?? 'Present';
+        }
+
+        final List rawSchedule = data['schedule'] ?? [];
+        List<Map<String, dynamic>> fullSessionHistory = [];
+        int subjectTotal = 0;
+        int subjectPresent = 0;
+
+        for (var session in rawSchedule) {
+          if (session['date'] is! Timestamp) continue;
+          DateTime sessionDate = (session['date'] as Timestamp).toDate();
+          final dateKey = DateFormat('yyyy-MM-dd').format(sessionDate);
+          final endParts = session['endTime'].split(':');
+          final DateTime sessionEndFull = DateTime(
+            sessionDate.year,
+            sessionDate.month,
+            sessionDate.day,
+            int.parse(endParts[0]),
+            int.parse(endParts[1]),
+          );
+
+          String status = "Upcoming";
+
+          if (attendanceMap.containsKey(dateKey)) {
+            status = attendanceMap[dateKey]!;
+          } else if (DateTime.now().isAfter(sessionEndFull)) {
+            final globalCheck = await firestore
+                .collection('attendance')
+                .where('subjectId', isEqualTo: subjectId)
+                .where('dateKey', isEqualTo: dateKey)
+                .limit(1)
+                .get();
+
+            if (globalCheck.docs.isNotEmpty) {
+              status = "Absent";
+            } else {
+              status = "Not Marked";
+            }
+          }
+
+          if (status == 'Present') subjectPresent++;
+          if (status == 'Present' || status == 'Absent') subjectTotal++;
+
+          fullSessionHistory.add({
+            'date': sessionDate,
+            'startTime': session['startTime'],
+            'endTime': session['endTime'],
+            'status': status,
+            'topic': "Lab Session",
+          });
+        }
+
+        fullSessionHistory.sort((a, b) => a['date'].compareTo(b['date']));
+        globalTotal += subjectTotal;
+        globalPresent += subjectPresent;
+
+        finalSubjects.add({
+          'id': subjectId,
+          'name': data['name'] ?? 'Unknown Subject',
+          'code': data['code'] ?? '---',
+          'faculty': facultyName,
+          'total': subjectTotal,
+          'attended': subjectPresent,
+          'sessions': fullSessionHistory,
+        });
+      }
+
+      finalSubjects.sort((a, b) => a['code'].compareTo(b['code']));
+
+      double overall = globalTotal == 0 ? 0.0 : (globalPresent / globalTotal);
+      return AttendanceData(
+        subjects: finalSubjects,
+        overallPercentage: overall,
+        totalClasses: globalTotal,
+        totalPresent: globalPresent,
+        activeSessionId: targetSessionId,
+        activeSessionName: targetSessionName,
+      );
     });
-  }
-
-  double overall = globalTotal == 0 ? 0.0 : (globalPresent / globalTotal);
-  return AttendanceData(
-    subjects: finalSubjects,
-    overallPercentage: overall,
-    totalClasses: globalTotal,
-    totalPresent: globalPresent,
-  );
-});
 
 class AttendanceScreen extends ConsumerWidget {
   const AttendanceScreen({super.key});
@@ -178,7 +246,10 @@ class AttendanceScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final isDarkMode = theme.brightness == Brightness.dark;
-    final attendanceAsync = ref.watch(attendanceProvider);
+
+    final selectedSessionId = ref.watch(selectedSessionProvider);
+    final attendanceAsync = ref.watch(attendanceProvider(selectedSessionId));
+    final sessionListAsync = ref.watch(sessionListProvider);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF7F8FA),
@@ -203,58 +274,284 @@ class AttendanceScreen extends ConsumerWidget {
           ),
         ),
       ),
-      body: attendanceAsync.when(
-        loading: () =>
-            Center(child: GeometricLoader(size: 50, isDarkMode: isDarkMode)),
-        error: (err, stack) => Center(child: Text('Error loading data')),
-        data: (data) {
-          if (data.subjects.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.assignment_outlined,
-                    size: 60,
-                    color: Colors.grey[300],
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    "No subjects found for this session",
-                    style: TextStyle(color: Colors.grey[500]),
-                  ),
-                ],
-              ),
-            );
-          }
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
+            child: sessionListAsync.when(
+              data: (sessions) {
+                if (sessions.isEmpty) return const SizedBox.shrink();
 
-          return CustomScrollView(
-            physics: const BouncingScrollPhysics(),
-            slivers: [
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: _OverallStatsCard(
-                    percentage: data.overallPercentage,
-                    total: data.totalClasses,
-                    present: data.totalPresent,
-                    theme: theme,
+                final currentSession = sessions.firstWhere(
+                  (s) => s['id'] == selectedSessionId,
+                  orElse: () => sessions.first,
+                );
+
+                return GestureDetector(
+                  onTap: () => _showPremiumSessionPicker(
+                    context,
+                    ref,
+                    sessions,
+                    selectedSessionId,
+                    theme,
                   ),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 16,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(
+                        color: theme.primaryColor.withOpacity(0.1),
+                        width: 1.5,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.04),
+                          blurRadius: 20,
+                          offset: const Offset(0, 8),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: theme.primaryColor.withOpacity(0.1),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            Icons.auto_awesome_motion_rounded,
+                            color: theme.primaryColor,
+                            size: 20,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                "Academic Session",
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.grey[500],
+                                  fontWeight: FontWeight.w600,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                currentSession['name'] ?? "Select Session",
+                                style: const TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xFF1A1A1A),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Icon(
+                          Icons.unfold_more_rounded,
+                          color: Colors.grey[400],
+                          size: 22,
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+              loading: () => Container(
+                height: 70,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                child: const Center(
+                  child: GeometricLoader(size: 20, isDarkMode: false),
                 ),
               ),
-              SliverPadding(
+              error: (_, __) => const SizedBox.shrink(),
+            ),
+          ),
+          Expanded(
+            child: attendanceAsync.when(
+              loading: () => Center(
+                child: GeometricLoader(size: 50, isDarkMode: isDarkMode),
+              ),
+              error: (err, stack) =>
+                  const Center(child: Text('Error loading data')),
+              data: (data) {
+                if (data.subjects.isEmpty) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.assignment_outlined,
+                          size: 60,
+                          color: Colors.grey[300],
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          "No subjects found for ${data.activeSessionName}",
+                          style: TextStyle(color: Colors.grey[500]),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+
+                return CustomScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  slivers: [
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: _OverallStatsCard(
+                          percentage: data.overallPercentage,
+                          total: data.totalClasses,
+                          present: data.totalPresent,
+                          theme: theme,
+                        ),
+                      ),
+                    ),
+                    SliverPadding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      sliver: SliverList(
+                        delegate: SliverChildBuilderDelegate((context, index) {
+                          final subject = data.subjects[index];
+                          return _SubjectCard(theme: theme, data: subject);
+                        }, childCount: data.subjects.length),
+                      ),
+                    ),
+                    const SliverToBoxAdapter(child: SizedBox(height: 40)),
+                  ],
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showPremiumSessionPicker(
+    BuildContext context,
+    WidgetRef ref,
+    List<Map<String, String>> sessions,
+    String? selectedId,
+    ThemeData theme,
+  ) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+        ),
+        padding: const EdgeInsets.symmetric(vertical: 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 24),
+            const Text(
+              "Select Session",
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w900,
+                letterSpacing: -0.5,
+              ),
+            ),
+            const SizedBox(height: 16),
+            ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(context).size.height * 0.4,
+              ),
+              child: ListView.separated(
+                shrinkWrap: true,
                 padding: const EdgeInsets.symmetric(horizontal: 24),
-                sliver: SliverList(
-                  delegate: SliverChildBuilderDelegate((context, index) {
-                    final subject = data.subjects[index];
-                    return _SubjectCard(theme: theme, data: subject);
-                  }, childCount: data.subjects.length),
-                ),
+                itemCount: sessions.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 12),
+                itemBuilder: (context, index) {
+                  final session = sessions[index];
+                  final isSelected = session['id'] == selectedId;
+
+                  return InkWell(
+                    onTap: () {
+                      ref.read(selectedSessionProvider.notifier).state =
+                          session['id'];
+                      Navigator.pop(context);
+                    },
+                    borderRadius: BorderRadius.circular(16),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? theme.primaryColor.withOpacity(0.05)
+                            : const Color(0xFFF7F8FA),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: isSelected
+                              ? theme.primaryColor
+                              : Colors.transparent,
+                          width: 1.5,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.calendar_today_rounded,
+                            size: 18,
+                            color: isSelected
+                                ? theme.primaryColor
+                                : Colors.grey,
+                          ),
+                          const SizedBox(width: 16),
+                          Text(
+                            session['name']!,
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: isSelected
+                                  ? FontWeight.bold
+                                  : FontWeight.w600,
+                              color: isSelected
+                                  ? theme.primaryColor
+                                  : Colors.black87,
+                            ),
+                          ),
+                          const Spacer(),
+                          if (isSelected)
+                            Icon(
+                              Icons.check_circle_rounded,
+                              color: theme.primaryColor,
+                              size: 20,
+                            ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
               ),
-              const SliverToBoxAdapter(child: SizedBox(height: 40)),
-            ],
-          );
-        },
+            ),
+            const SizedBox(height: 16),
+          ],
+        ),
       ),
     );
   }
@@ -278,10 +575,10 @@ class _OverallStatsCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
+        gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [const Color(0xFF1A1A1A), const Color(0xFF2C2C2C)],
+          colors: [Color(0xFF1A1A1A), Color(0xFF2C2C2C)],
         ),
         borderRadius: BorderRadius.circular(32),
         boxShadow: [
@@ -541,8 +838,6 @@ class _MiniStat extends StatelessWidget {
   }
 }
 
-// --- DETAIL SCREEN ---
-
 class SubjectDetailScreen extends StatelessWidget {
   final Map<String, dynamic> data;
   final ThemeData theme;
@@ -561,12 +856,11 @@ class SubjectDetailScreen extends StatelessWidget {
         : data['attended'] / data['total'];
     final int percentInt = (percentage * 100).toInt();
 
-    // Status colors logic
     Color getStatusColor(String status) {
       if (status == 'Present') return const Color(0xFF10B981);
       if (status == 'Absent') return const Color(0xFFEF4444);
       if (status == 'Upcoming') return Colors.blue;
-      return Colors.orange; // Not Marked
+      return Colors.orange;
     }
 
     return Scaffold(
@@ -620,9 +914,7 @@ class SubjectDetailScreen extends StatelessWidget {
                             value: percentage,
                             strokeWidth: 8,
                             backgroundColor: Colors.white,
-                            color: const Color(
-                              0xFF1A1A1A,
-                            ), // Black color for progress
+                            color: const Color(0xFF1A1A1A),
                             strokeCap: StrokeCap.round,
                           ),
                           Center(
@@ -634,9 +926,7 @@ class SubjectDetailScreen extends StatelessWidget {
                                   style: const TextStyle(
                                     fontSize: 20,
                                     fontWeight: FontWeight.w900,
-                                    color: Color(
-                                      0xFF1A1A1A,
-                                    ), // Black color text
+                                    color: Color(0xFF1A1A1A),
                                     decoration: TextDecoration.none,
                                   ),
                                 ),
